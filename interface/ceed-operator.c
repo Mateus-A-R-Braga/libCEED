@@ -88,6 +88,7 @@ static int CeedOperatorCheckField(Ceed ceed, CeedQFunctionField qf_field,
     // LCOV_EXCL_STOP
 
   }
+  CeedFESpace FE_space = b->basis_space;
   // Field size
   switch(eval_mode) {
   case CEED_EVAL_NONE:
