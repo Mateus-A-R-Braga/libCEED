@@ -347,8 +347,6 @@ CEED_EXTERN int CeedElemRestrictionGetNumElements(CeedElemRestriction rstr,
     CeedInt *num_elem);
 CEED_EXTERN int CeedElemRestrictionGetElementSize(CeedElemRestriction rstr,
     CeedInt *elem_size);
-CEED_EXTERN int CeedElemRestrictionGetScale(CeedElemRestriction rstr,
-    CeedScalar *scale);
 CEED_EXTERN int CeedElemRestrictionGetLVectorSize(CeedElemRestriction rstr,
     CeedSize *l_size);
 CEED_EXTERN int CeedElemRestrictionGetNumComponents(CeedElemRestriction rstr,
@@ -446,7 +444,6 @@ CEED_EXTERN int CeedBasisCreateHdiv(Ceed ceed, CeedElemTopology topo,
 CEED_EXTERN int CeedBasisCreateProjection(CeedBasis basis_from, CeedBasis basis_to, CeedBasis *basis_project);
 CEED_EXTERN int CeedBasisReferenceCopy(CeedBasis basis, CeedBasis *basis_copy);
 CEED_EXTERN int CeedBasisView(CeedBasis basis, FILE *stream);
-CEED_EXTERN int CeedBasisHdivView(CeedBasis basis, FILE *stream);
 CEED_EXTERN int CeedBasisApply(CeedBasis basis, CeedInt num_elem,
                                CeedTransposeMode t_mode,
                                CeedEvalMode eval_mode, CeedVector u, CeedVector v);
