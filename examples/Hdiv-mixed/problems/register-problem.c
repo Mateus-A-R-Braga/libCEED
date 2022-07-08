@@ -32,7 +32,8 @@ PetscErrorCode RegisterProblems_Hdiv(AppCtx app_ctx) {
   // 3) darcy3d-prism
 
   // 4) richard
-
+  PetscCall( PetscFunctionListAdd(&app_ctx->problems, "richard2d",
+                                  Hdiv_RICHARD2D) );
   PetscFunctionReturn(0);
 }
 

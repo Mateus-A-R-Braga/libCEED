@@ -101,6 +101,21 @@ CEED_QFUNCTION_HELPER int AlphaMatVecMult3x3(const CeedScalar alpha,
 };
 
 // -----------------------------------------------------------------------------
+// Compute matrix-vector product: alpha*A^T*u
+// -----------------------------------------------------------------------------
+CEED_QFUNCTION_HELPER int AlphaMatTransposeVecMult3x3(const CeedScalar alpha,
+    const CeedScalar A[3][3], const CeedScalar u[3], CeedScalar v[3]) {
+  // Compute v = alpha*A^T*u
+  for (CeedInt k = 0; k < 3; k++) {
+    v[k] = 0;
+    for (CeedInt m = 0; m < 3; m++)
+      v[k] += A[m][k] * u[m] * alpha;
+  }
+
+  return 0;
+};
+
+// -----------------------------------------------------------------------------
 // Compute alpha * A * B = C
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION_HELPER int AlphaMatMatMult2x2(const CeedScalar alpha,
@@ -167,6 +182,21 @@ CEED_QFUNCTION_HELPER int AlphaMatVecMult2x2(const CeedScalar alpha,
     v[k] = 0;
     for (CeedInt m = 0; m < 2; m++)
       v[k] += A[k][m] * u[m] * alpha;
+  }
+
+  return 0;
+};
+
+// -----------------------------------------------------------------------------
+// Compute matrix-vector product: alpha*A^T*u
+// -----------------------------------------------------------------------------
+CEED_QFUNCTION_HELPER int AlphaMatTransposeVecMult2x2(const CeedScalar alpha,
+    const CeedScalar A[2][2], const CeedScalar u[2], CeedScalar v[2]) {
+  // Compute v = alpha*A^T*u
+  for (CeedInt k = 0; k < 2; k++) {
+    v[k] = 0;
+    for (CeedInt m = 0; m < 2; m++)
+      v[k] += A[m][k] * u[m] * alpha;
   }
 
   return 0;

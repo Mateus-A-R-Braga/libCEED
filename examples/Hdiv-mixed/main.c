@@ -76,9 +76,6 @@ int main(int argc, char **argv) {
   Physics phys_ctx;
   PetscCall( PetscCalloc1(1, &phys_ctx) );
 
-  OperatorApplyContext op_apply_ctx;
-  PetscCall( PetscCalloc1(1, &op_apply_ctx) );
-
   // ---------------------------------------------------------------------------
   // Process command line options
   // ---------------------------------------------------------------------------
@@ -119,39 +116,35 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Create local Force vector
   // ---------------------------------------------------------------------------
-  Vec F_loc;
-  PetscInt F_loc_size;
-  CeedScalar *f;
-  CeedVector force_ceed, target, bc_pressure;
-  PetscMemType force_mem_type;
-  PetscCall( DMCreateLocalVector(dm, &F_loc) );
+  Vec U_loc;
+  PetscInt U_loc_size;
+  //CeedVector bc_pressure;
+  PetscCall( DMCreateLocalVector(dm, &U_loc) );
   // Local size for libCEED
-  PetscCall( VecGetSize(F_loc, &F_loc_size) );
-  PetscCall( VecZeroEntries(F_loc) );
-  PetscCall( VecGetArrayAndMemType(F_loc, &f, &force_mem_type) );
-  CeedVectorCreate(ceed, F_loc_size, &force_ceed);
-  CeedVectorSetArray(force_ceed, MemTypeP2C(force_mem_type), CEED_USE_POINTER, f);
-  CeedVectorCreate(ceed, F_loc_size, &bc_pressure);
-  CeedVectorSetArray(bc_pressure, MemTypeP2C(force_mem_type), CEED_USE_POINTER,
-                     f);
+  PetscCall( VecGetSize(U_loc, &U_loc_size) );
+
   // ---------------------------------------------------------------------------
-  // Setup libCEED - Compute local F and true solution (target)
+  // Setup libCEED
   // ---------------------------------------------------------------------------
   // -- Set up libCEED objects
   PetscCall( SetupLibceed(dm, ceed, app_ctx, problem_data,
-                          F_loc_size, ceed_data, force_ceed, &target) );
+                          U_loc_size, ceed_data) );
   //CeedVectorView(force_ceed, "%12.8f", stdout);
-  PetscCall( DMAddBoundariesPressure(ceed, ceed_data, app_ctx, problem_data, dm,
-                                     bc_pressure) );
+  //PetscCall( DMAddBoundariesPressure(ceed, ceed_data, app_ctx, problem_data, dm,
+  //                                   bc_pressure) );
+
+
   // ---------------------------------------------------------------------------
-  // Create global F
+  // Setup TSSolve for Richard problem
   // ---------------------------------------------------------------------------
-  Vec F;
-  CeedVectorTakeArray(force_ceed, MemTypeP2C(force_mem_type), NULL);
-  PetscCall( VecRestoreArrayAndMemType(F_loc, &f) );
-  PetscCall( DMCreateGlobalVector(dm, &F) );
-  PetscCall( VecZeroEntries(F) );
-  PetscCall( DMLocalToGlobal(dm, F_loc, ADD_VALUES, F) );
+  if (problem_data->has_ts) {
+    // ---------------------------------------------------------------------------
+    // Create global initial conditions
+    // ---------------------------------------------------------------------------
+    Vec U0;
+    CreateInitialConditions(dm, ceed_data, &U0);
+    PetscCall( VecDestroy(&U0) );
+  }
 
   // ---------------------------------------------------------------------------
   // Solve PDE
@@ -162,14 +155,14 @@ int main(int argc, char **argv) {
   Vec U;
   PetscCall( SNESCreate(comm, &snes) );
   PetscCall( SNESGetKSP(snes, &ksp) );
-  PetscCall( PDESolver(comm, dm, ceed, ceed_data, vec_type, snes, ksp, F, &U) );
+  PetscCall( PDESolver(comm, dm, ceed, ceed_data, vec_type, snes, ksp, &U) );
   //VecView(U, PETSC_VIEWER_STDOUT_WORLD);
 
   // ---------------------------------------------------------------------------
   // Compute L2 error of mms problem
   // ---------------------------------------------------------------------------
   CeedScalar l2_error_u, l2_error_p;
-  PetscCall( ComputeL2Error(dm, ceed,ceed_data, U, target, &l2_error_u,
+  PetscCall( ComputeL2Error(dm, ceed,ceed_data, U, &l2_error_u,
                             &l2_error_p) );
 
   // ---------------------------------------------------------------------------
@@ -194,11 +187,8 @@ int main(int argc, char **argv) {
   // Free PETSc objects
   PetscCall( DMDestroy(&dm) );
   PetscCall( VecDestroy(&U) );
-  PetscCall( VecDestroy(&F) );
-  PetscCall( VecDestroy(&F_loc) );
+  PetscCall( VecDestroy(&U_loc) );
   PetscCall( SNESDestroy(&snes) );
-  PetscCall( VecDestroy(&op_apply_ctx->Y_loc) );
-  PetscCall( VecDestroy(&op_apply_ctx->X_loc) );
 
   // -- Function list
   PetscCall( PetscFunctionListDestroy(&app_ctx->problems) );
@@ -207,12 +197,9 @@ int main(int argc, char **argv) {
   PetscCall( PetscFree(app_ctx) );
   PetscCall( PetscFree(problem_data) );
   PetscCall( PetscFree(phys_ctx) );
-  PetscCall( PetscFree(op_apply_ctx) );
 
   // Free libCEED objects
-  CeedVectorDestroy(&force_ceed);
-  CeedVectorDestroy(&bc_pressure);
-  CeedVectorDestroy(&target);
+  //CeedVectorDestroy(&bc_pressure);
   PetscCall( CeedDataDestroy(ceed_data) );
   CeedDestroy(&ceed);
 
