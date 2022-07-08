@@ -67,8 +67,8 @@ struct Physics_ {
 typedef struct OperatorApplyContext_ *OperatorApplyContext;
 struct OperatorApplyContext_ {
   MPI_Comm        comm;
-  Vec             X_loc, Y_loc;
-  CeedVector      x_ceed, y_ceed;
+  Vec             X_loc, Y_loc, X_t_loc;
+  CeedVector      x_ceed, y_ceed, x_t_ceed;
   CeedOperator    op_apply;
   DM              dm;
   Ceed            ceed;
@@ -79,23 +79,24 @@ typedef struct CeedData_ *CeedData;
 struct CeedData_ {
   CeedBasis            basis_x, basis_u, basis_p, basis_u_face;
   CeedElemRestriction  elem_restr_x, elem_restr_u, elem_restr_U_i,
-                       elem_restr_p;
-  CeedQFunction        qf_residual, qf_jacobian, qf_error;
-  CeedOperator         op_residual, op_jacobian, op_error;
-  CeedVector           x_ceed, y_ceed, x_coord;
-  OperatorApplyContext ctx_residual, ctx_jacobian, ctx_error;
+                       elem_restr_p, elem_restr_p_i;
+  CeedQFunction        qf_residual, qf_jacobian, qf_error, qf_ics;
+  CeedOperator         op_residual, op_jacobian, op_error, op_ics;
+  CeedVector           x_ceed, y_ceed, x_coord, U0_ceed, x_t_ceed;
+  OperatorApplyContext ctx_residual, ctx_jacobian, ctx_error, ctx_residual_ut;
 };
 
 // Problem specific data
 typedef struct ProblemData_ *ProblemData;
 struct ProblemData_ {
-  CeedQFunctionUser force, residual, jacobian, error,
-                    setup_true, bc_pressure;
-  const char        *force_loc, *residual_loc, *jacobian_loc,
-        *error_loc, *setup_true_loc, *bc_pressure_loc;
+  CeedQFunctionUser true_solution, residual, jacobian, error, ics,
+                    bc_pressure;
+  const char        *true_solution_loc, *residual_loc, *jacobian_loc,
+        *error_loc, *bc_pressure_loc, *ics_loc;
   CeedQuadMode      quadrature_mode;
   CeedInt           elem_node, dim, q_data_size_face;
   CeedQFunctionContext qfunction_context;
+  PetscBool         has_ts;
 };
 
 #endif // structs_h

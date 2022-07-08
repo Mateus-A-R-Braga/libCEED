@@ -18,7 +18,7 @@
 /// Utility functions for setting up Darcy problem in 3D
 
 #include "../include/register-problem.h"
-#include "../qfunctions/darcy-force3d.h"
+#include "../qfunctions/darcy-true3d.h"
 #include "../qfunctions/darcy-system3d.h"
 #include "../qfunctions/darcy-error3d.h"
 #include "../qfunctions/pressure-boundary3d.h"
@@ -39,8 +39,8 @@ PetscErrorCode Hdiv_DARCY3D(Ceed ceed, ProblemData problem_data, void *ctx) {
   problem_data->elem_node               = 8;
   problem_data->q_data_size_face        = 4;
   problem_data->quadrature_mode         = CEED_GAUSS;
-  problem_data->force                   = DarcyForce3D;
-  problem_data->force_loc               = DarcyForce3D_loc;
+  problem_data->true_solution           = DarcyTrue3D;
+  problem_data->true_solution_loc       = DarcyTrue3D_loc;
   problem_data->residual                = DarcySystem3D;
   problem_data->residual_loc            = DarcySystem3D_loc;
   problem_data->jacobian                = JacobianDarcySystem3D;
@@ -49,23 +49,37 @@ PetscErrorCode Hdiv_DARCY3D(Ceed ceed, ProblemData problem_data, void *ctx) {
   problem_data->error_loc               = DarcyError3D_loc;
   problem_data->bc_pressure             = BCPressure3D;
   problem_data->bc_pressure_loc         = BCPressure3D_loc;
+  problem_data->has_ts                  = PETSC_FALSE;
 
   // ------------------------------------------------------
   //              Command line Options
   // ------------------------------------------------------
-  CeedScalar kappa = 1.;
+  CeedScalar kappa = 1., rho_a0 = 998.2, g = 9.8, alpha_a = 1., b_a = 10.;
   PetscOptionsBegin(app_ctx->comm, NULL, "Options for Hdiv-mixed problem", NULL);
   PetscCall( PetscOptionsScalar("-kappa", "Hydraulic Conductivity", NULL,
                                 kappa, &kappa, NULL));
+  PetscCall( PetscOptionsScalar("-rho_a0", "Density at p0", NULL,
+                                rho_a0, &rho_a0, NULL));
+  PetscCall( PetscOptionsScalar("-alpha_a", "Parameter for relative permeability",
+                                NULL,
+                                alpha_a, &alpha_a, NULL));
+  PetscCall( PetscOptionsScalar("-b_a", "Parameter for relative permeability",
+                                NULL,
+                                b_a, &b_a, NULL));
   PetscOptionsEnd();
 
   darcy_ctx->kappa = kappa;
+  darcy_ctx->rho_a0 = rho_a0;
+  darcy_ctx->g = g;
+  darcy_ctx->alpha_a = alpha_a;
+  darcy_ctx->b_a = b_a;
+
   CeedQFunctionContextCreate(ceed, &darcy_context);
   CeedQFunctionContextSetData(darcy_context, CEED_MEM_HOST, CEED_COPY_VALUES,
                               sizeof(*darcy_ctx), darcy_ctx);
   problem_data->qfunction_context = darcy_context;
   CeedQFunctionContextSetDataDestroy(darcy_context, CEED_MEM_HOST,
                                      FreeContextPetsc);
-
+  PetscCall( PetscFree(darcy_ctx) );
   PetscFunctionReturn(0);
 }

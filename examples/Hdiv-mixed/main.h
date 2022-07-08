@@ -10,5 +10,6 @@
 #include "include/register-problem.h"
 #include "include/setup-matops.h"
 #include "include/setup-solvers.h"
+#include "include/setup-ts.h"
 
 #endif // MAIN_H

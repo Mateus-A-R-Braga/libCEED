@@ -17,6 +17,7 @@ PetscErrorCode Hdiv_DARCY3D(Ceed ceed, ProblemData problem_data, void *ctx);
 // 3) darcy3dprism
 
 // 4) richard
+PetscErrorCode Hdiv_RICHARD2D(Ceed ceed, ProblemData problem_data, void *ctx);
 
 extern int FreeContextPetsc(void *);
 

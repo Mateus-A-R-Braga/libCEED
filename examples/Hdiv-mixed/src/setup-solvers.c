@@ -107,8 +107,7 @@ PetscErrorCode SNESFormJacobian(SNES snes, Vec U, Mat J, Mat J_pre,
 // Setup Solver
 // ---------------------------------------------------------------------------
 PetscErrorCode PDESolver(MPI_Comm comm, DM dm, Ceed ceed, CeedData ceed_data,
-                         VecType vec_type, SNES snes, KSP ksp,
-                         Vec F, Vec *U_g) {
+                         VecType vec_type, SNES snes, KSP ksp, Vec *U_g) {
 
   PetscInt       U_l_size, U_g_size;
 
@@ -158,34 +157,42 @@ PetscErrorCode PDESolver(MPI_Comm comm, DM dm, Ceed ceed, CeedData ceed_data,
 
   // Solve
   PetscCall( VecSet(*U_g, 0.0));
-  PetscCall( SNESSolve(snes, F, *U_g));
+  PetscCall( SNESSolve(snes, NULL, *U_g));
 
   // Free PETSc objects
   PetscCall( MatDestroy(&mat_jacobian) );
   PetscCall( VecDestroy(&R) );
+  PetscCall( VecDestroy(&ceed_data->ctx_jacobian->Y_loc) );
+  PetscCall( VecDestroy(&ceed_data->ctx_jacobian->X_loc) );
+  PetscCall( VecDestroy(&ceed_data->ctx_residual->Y_loc) );
+  PetscCall( VecDestroy(&ceed_data->ctx_residual->X_loc) );
   PetscFunctionReturn(0);
 };
 
 // -----------------------------------------------------------------------------
 // This function calculates the L2 error in the final solution
 // -----------------------------------------------------------------------------
-PetscErrorCode ComputeL2Error(DM dm, Ceed ceed, CeedData ceed_data, Vec X,
-                              CeedVector target,
+PetscErrorCode ComputeL2Error(DM dm, Ceed ceed, CeedData ceed_data, Vec U,
                               CeedScalar *l2_error_u,
                               CeedScalar *l2_error_p) {
   PetscScalar *x;
   PetscMemType mem_type;
   CeedVector collocated_error;
-  CeedSize length;
 
   PetscFunctionBeginUser;
 
-  CeedVectorGetLength(target, &length);
-  CeedVectorCreate(ceed, length, &collocated_error);
   PetscCall( PetscCalloc1(1, &ceed_data->ctx_error) );
   SetupErrorOperatorCtx(dm, ceed, ceed_data, ceed_data->ctx_error);
+  CeedInt c_start, c_end, dim, num_elem, num_qpts;
+  PetscCall( DMGetDimension(ceed_data->ctx_error->dm, &dim) );
+  CeedBasisGetNumQuadraturePoints(ceed_data->basis_u, &num_qpts);
+  PetscCall( DMPlexGetHeightStratum(ceed_data->ctx_error->dm, 0, &c_start,
+                                    &c_end) );
+  num_elem = c_end -c_start;
+  CeedVectorCreate(ceed, num_elem*num_qpts*(dim+1), &collocated_error);
+
   // Global-to-local
-  PetscCall( DMGlobalToLocal(ceed_data->ctx_error->dm, X, INSERT_VALUES,
+  PetscCall( DMGlobalToLocal(ceed_data->ctx_error->dm, U, INSERT_VALUES,
                              ceed_data->ctx_error->X_loc) );
 
   // Setup CEED vector
@@ -203,12 +210,6 @@ PetscErrorCode ComputeL2Error(DM dm, Ceed ceed, CeedData ceed_data, Vec X,
   PetscCall( VecRestoreArrayReadAndMemType(ceed_data->ctx_error->X_loc,
              (const PetscScalar **)&x) );
   // Compute L2 error for each field
-  CeedInt c_start, c_end, dim, num_elem, num_qpts;
-  PetscCall( DMGetDimension(ceed_data->ctx_error->dm, &dim) );
-  PetscCall( DMPlexGetHeightStratum(ceed_data->ctx_error->dm, 0, &c_start,
-                                    &c_end) );
-  num_elem = c_end -c_start;
-  num_qpts = length / (num_elem*(dim+1));
   CeedInt cent_qpts = num_qpts / 2;
   CeedVector collocated_error_u, collocated_error_p;
   const CeedScalar *E_U; // to store total error
@@ -250,6 +251,8 @@ PetscErrorCode ComputeL2Error(DM dm, Ceed ceed, CeedData ceed_data, Vec X,
   CeedVectorDestroy(&collocated_error);
   CeedVectorDestroy(&collocated_error_u);
   CeedVectorDestroy(&collocated_error_p);
+  PetscCall( VecDestroy(&ceed_data->ctx_error->Y_loc) );
+  PetscCall( VecDestroy(&ceed_data->ctx_error->X_loc) );
 
   PetscFunctionReturn(0);
 };
