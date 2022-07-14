@@ -202,6 +202,7 @@ PetscErrorCode GetError_NS(CeedData ceed_data, DM dm, User user, Vec Q,
   PetscCall(DMPlexInsertBoundaryValues(dm, PETSC_TRUE, Q_loc, final_time,
                                        NULL, NULL, NULL));
   NormType norm_type = NORM_MAX;
+  MPI_Op norm_reduce = MPI_MAX;
   // Get |exact solution - obtained solution|
   if (1) { // Reports error in primitive form when run with conservative
     Vec Q_prim_exact, Q_prim;
@@ -216,8 +217,10 @@ PetscErrorCode GetError_NS(CeedData ceed_data, DM dm, User user, Vec Q,
     // Get norm of each component
     PetscReal norm_exact[5], norm_error[5], rel_error[5];
     ierr = VecStrideNormAll(Q_prim_exact, norm_type, norm_exact); CHKERRQ(ierr);
+    PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, norm_exact, 5, MPIU_REAL, norm_reduce, PETSC_COMM_WORLD));
     ierr = VecAXPY(Q_prim, -1.0, Q_prim_exact);  CHKERRQ(ierr);
     ierr = VecStrideNormAll(Q_prim, norm_type, norm_error); CHKERRQ(ierr);
+    PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, norm_error, 5, MPIU_REAL, norm_reduce, PETSC_COMM_WORLD));
     ierr = PetscPrintf(PETSC_COMM_WORLD,
                        "Relative Error converted from conservative to primitive:\n"); CHKERRQ(ierr);
     for (int i=0; i<5; i++) {
@@ -233,8 +236,10 @@ PetscErrorCode GetError_NS(CeedData ceed_data, DM dm, User user, Vec Q,
   if (1) { // Report errors in conservative
     PetscReal norm_exact[5], norm_error[5], rel_error[5];
     ierr = VecStrideNormAll(Q_exact_loc, norm_type, norm_exact); CHKERRQ(ierr);
+    PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, norm_exact, 5, MPIU_REAL, norm_reduce, PETSC_COMM_WORLD));
     ierr = VecAXPY(Q_loc, -1.0, Q_exact_loc);  CHKERRQ(ierr);
     ierr = VecStrideNormAll(Q_loc, norm_type, norm_error); CHKERRQ(ierr);
+    PetscCallMPI(MPI_Allreduce(MPI_IN_PLACE, norm_error, 5, MPIU_REAL, norm_reduce, PETSC_COMM_WORLD));
     ierr = PetscPrintf(PETSC_COMM_WORLD,
                        "Relative Error in conservative:\n"); CHKERRQ(ierr);
     for (int i=0; i<5; i++) {
