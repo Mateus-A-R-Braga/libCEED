@@ -245,33 +245,6 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
                      (PetscScalar *)coordArray);
   PetscCall( VecRestoreArrayRead(coords, &coordArray) );
 
-  // ---------------------------------------------------------------------------
-  // Setup true solution and force
-  // ---------------------------------------------------------------------------
-  CeedVector true_vec, true_force;
-  CeedVectorCreate(ceed, num_elem*num_qpts*(dim+1), &true_vec);
-  CeedVectorCreate(ceed, num_elem*num_qpts*1, &true_force);
-  // Create the q-function that sets up the RHS and true solution
-  CeedQFunctionCreateInterior(ceed, 1, problem_data->true_solution,
-                              problem_data->true_solution_loc, &qf_true);
-  CeedQFunctionSetContext(qf_true, problem_data->qfunction_context);
-  //CeedQFunctionContextDestroy(&problem_data->qfunction_context);
-  CeedQFunctionAddInput(qf_true, "x", num_comp_x, CEED_EVAL_INTERP);
-  CeedQFunctionAddOutput(qf_true, "true force", 1, CEED_EVAL_NONE);
-  CeedQFunctionAddOutput(qf_true, "true solution", dim+1, CEED_EVAL_NONE);
-  // Create the operator that builds the RHS and true solution
-  CeedOperatorCreate(ceed, qf_true, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
-                     &op_true);
-  CeedOperatorSetField(op_true, "x", ceed_data->elem_restr_x,
-                       ceed_data->basis_x, ceed_data->x_coord);
-  CeedOperatorSetField(op_true, "true force", ceed_data->elem_restr_p_i,
-                       CEED_BASIS_COLLOCATED, true_force);
-  CeedOperatorSetField(op_true, "true solution", ceed_data->elem_restr_U_i,
-                       CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
-  // Setup RHS and true solution
-  CeedOperatorApply(op_true, ceed_data->x_coord, true_vec,
-                    CEED_REQUEST_IMMEDIATE);
-
   if (problem_data->has_ts) {
     // ---------------------------------------------------------------------------
     // Setup qfunction for initial conditions
@@ -299,12 +272,46 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
     ceed_data->qf_ics = qf_ics;
     ceed_data->op_ics = op_ics;
   }
+
+  // ---------------------------------------------------------------------------
+  // Setup true solution and force
+  // ---------------------------------------------------------------------------
+  CeedVector true_vec, true_force;
+  CeedVectorCreate(ceed, num_elem*num_qpts*(dim+1), &true_vec);
+  CeedVectorCreate(ceed, num_elem*num_qpts*1, &true_force);
+  // Create the q-function that sets up the RHS and true solution
+  CeedQFunctionCreateInterior(ceed, 1, problem_data->true_solution,
+                              problem_data->true_solution_loc, &qf_true);
+  CeedQFunctionSetContext(qf_true, problem_data->qfunction_context);
+  CeedQFunctionAddInput(qf_true, "x", num_comp_x, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(qf_true, "true force", 1, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(qf_true, "true solution", dim+1, CEED_EVAL_NONE);
+  // Create the operator that builds the RHS and true solution
+  CeedOperatorCreate(ceed, qf_true, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
+                     &op_true);
+  if (problem_data->has_ts) {
+    double value_time = 2.0;
+    CeedOperatorContextGetFieldLabel(op_true, "time",
+                                   &app_ctx->solution_time_label);
+    CeedOperatorContextSetDouble(op_true,
+                                   app_ctx->solution_time_label, &value_time);
+  }
+  CeedOperatorSetField(op_true, "x", ceed_data->elem_restr_x,
+                       ceed_data->basis_x, ceed_data->x_coord);
+  CeedOperatorSetField(op_true, "true force", ceed_data->elem_restr_p_i,
+                       CEED_BASIS_COLLOCATED, true_force);
+  CeedOperatorSetField(op_true, "true solution", ceed_data->elem_restr_U_i,
+                       CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  // Setup RHS and true solution
+  CeedOperatorApply(op_true, ceed_data->x_coord, true_vec,
+                    CEED_REQUEST_IMMEDIATE);
   // ---------------------------------------------------------------------------
   // Persistent libCEED vectors
   // ---------------------------------------------------------------------------
   // -- Operator action variables: we use them in setup-solvers.c
   CeedVectorCreate(ceed, U_loc_size, &ceed_data->x_ceed);
   CeedVectorCreate(ceed, U_loc_size, &ceed_data->y_ceed);
+  if (!problem_data->has_ts) {
   // Local residual evaluator
   // ---------------------------------------------------------------------------
   // Create the QFunction and Operator that computes the residual of the PDE.
@@ -443,6 +450,7 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
   CeedVectorDestroy(&true_force);
   CeedQFunctionDestroy(&qf_true);
   CeedOperatorDestroy(&op_true);
+  }
   PetscFunctionReturn(0);
 };
 // -----------------------------------------------------------------------------

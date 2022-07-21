@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
   PetscCall( CreateDM(comm, vec_type, &dm) );
   // TODO: add mesh option
   // perturb to have smooth random mesh
-  PetscCall( PerturbVerticesSmooth(dm) );
+  // PetscCall( PerturbVerticesSmooth(dm) );
 
   // ---------------------------------------------------------------------------
   // Setup FE
@@ -143,6 +143,7 @@ int main(int argc, char **argv) {
     // ---------------------------------------------------------------------------
     Vec U0;
     CreateInitialConditions(dm, ceed_data, &U0);
+    VecView(U0, PETSC_VIEWER_STDOUT_WORLD);
     PetscCall( VecDestroy(&U0) );
   }
 
