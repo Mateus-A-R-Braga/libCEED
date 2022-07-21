@@ -19,7 +19,7 @@
 
 #include "../include/register-problem.h"
 #include "../qfunctions/richard-system2d.h"
-#include "../qfunctions/richard-mms2d.h"
+#include "../qfunctions/richard-true2d.h"
 #include "../qfunctions/pressure-boundary2d.h"
 #include "petscsystypes.h"
 
@@ -41,8 +41,8 @@ PetscErrorCode Hdiv_RICHARD2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   problem_data->quadrature_mode         = CEED_GAUSS;
   problem_data->ics                     = RichardICs2D;
   problem_data->ics_loc                 = RichardICs2D_loc;
-  //problem_data->force                   = RichardTrue2D;
-  //problem_data->force_loc               = RichardTrue2D_loc;
+  problem_data->true_solution           = RichardTrue2D;
+  problem_data->true_solution_loc       = RichardTrue2D_loc;
   //problem_data->residual                = RichardSystem2D;
   //problem_data->residual_loc            = RichardSystem2D_loc;
   //problem_data->jacobian                = JacobianRichardSystem2D;
@@ -81,11 +81,12 @@ PetscErrorCode Hdiv_RICHARD2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   richard_ctx->beta = beta;
   richard_ctx->g = g;
   richard_ctx->p0 = p0;
-  richard_ctx->time = 0.;
   richard_ctx->gamma = 5.;
   CeedQFunctionContextCreate(ceed, &richard_context);
   CeedQFunctionContextSetData(richard_context, CEED_MEM_HOST, CEED_COPY_VALUES,
                               sizeof(*richard_ctx), richard_ctx);
+  CeedQFunctionContextRegisterDouble(richard_context, "time",
+                                     offsetof(struct RICHARDContext_, t), 1, "current solver time");
   problem_data->qfunction_context = richard_context;
   CeedQFunctionContextSetDataDestroy(richard_context, CEED_MEM_HOST,
                                      FreeContextPetsc);

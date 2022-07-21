@@ -67,13 +67,11 @@
 typedef struct RICHARDContext_ *RICHARDContext;
 struct RICHARDContext_ {
   CeedScalar kappa;
-  CeedScalar alpha_a;
-  CeedScalar b_a;
-  CeedScalar rho_a0;
-  CeedScalar beta;
   CeedScalar g;
-  CeedScalar p0;
-  CeedScalar time;
+  CeedScalar rho_a0;
+  CeedScalar alpha_a, b_a;
+  CeedScalar beta, p0;
+  CeedScalar t;
   CeedScalar gamma;
 };
 #endif

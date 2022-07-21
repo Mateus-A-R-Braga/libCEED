@@ -44,7 +44,7 @@ PetscErrorCode CreateInitialConditions(DM dm, CeedData ceed_data, Vec *U0) {
 
 }
 // -----------------------------------------------------------------------------
-// Setup operator context data
+// Setup operator context data for Richard problem
 // -----------------------------------------------------------------------------
 PetscErrorCode SetupResidualOperatorCtx_Ut(DM dm, Ceed ceed, CeedData ceed_data,
     OperatorApplyContext ctx_residual_ut) {
@@ -68,8 +68,6 @@ PetscErrorCode TSFormIResidual(TS ts, PetscReal time, Vec X, Vec X_t, Vec Y,
   OperatorApplyContext ctx   = (OperatorApplyContext)ctx_residual_ut;
   const PetscScalar *x, *x_t;
   PetscScalar *y;
-  Vec               X_loc = ctx->X_loc, X_t_loc = ctx->X_t_loc,
-                    Y_loc = ctx->Y_loc;
   PetscMemType      x_mem_type, x_t_mem_type, y_mem_type;
   PetscFunctionBeginUser;
 
@@ -77,13 +75,13 @@ PetscErrorCode TSFormIResidual(TS ts, PetscReal time, Vec X, Vec X_t, Vec Y,
 
 
   // Global-to-local
-  PetscCall( DMGlobalToLocal(ctx->dm, X, INSERT_VALUES, X_loc) );
-  PetscCall( DMGlobalToLocal(ctx->dm, X_t, INSERT_VALUES, X_t_loc) );
+  PetscCall( DMGlobalToLocal(ctx->dm, X, INSERT_VALUES, ctx->X_loc) );
+  PetscCall( DMGlobalToLocal(ctx->dm, X_t, INSERT_VALUES, ctx->X_t_loc) );
 
   // Place PETSc vectors in CEED vectors
-  PetscCall( VecGetArrayReadAndMemType(X_loc, &x, &x_mem_type) );
-  PetscCall( VecGetArrayReadAndMemType(X_t_loc, &x_t, &x_t_mem_type) );
-  PetscCall( VecGetArrayAndMemType(Y_loc, &y, &y_mem_type) );
+  PetscCall( VecGetArrayReadAndMemType(ctx->X_loc, &x, &x_mem_type) );
+  PetscCall( VecGetArrayReadAndMemType(ctx->X_t_loc, &x_t, &x_t_mem_type) );
+  PetscCall( VecGetArrayAndMemType(ctx->Y_loc, &y, &y_mem_type) );
   CeedVectorSetArray(ctx->x_ceed, MemTypeP2C(x_mem_type), CEED_USE_POINTER,
                      (PetscScalar *)x);
   CeedVectorSetArray(ctx->x_t_ceed, MemTypeP2C(x_t_mem_type),
@@ -98,16 +96,16 @@ PetscErrorCode TSFormIResidual(TS ts, PetscReal time, Vec X, Vec X_t, Vec Y,
   CeedVectorTakeArray(ctx->x_ceed, MemTypeP2C(x_mem_type), NULL);
   CeedVectorTakeArray(ctx->x_t_ceed, MemTypeP2C(x_t_mem_type), NULL);
   CeedVectorTakeArray(ctx->y_ceed, MemTypeP2C(y_mem_type), NULL);
-  PetscCall( VecRestoreArrayReadAndMemType(X_loc, &x) );
-  PetscCall( VecRestoreArrayReadAndMemType(X_t_loc, &x_t) );
-  PetscCall( VecRestoreArrayAndMemType(Y_loc, &y) );
+  PetscCall( VecRestoreArrayReadAndMemType(ctx->X_loc, &x) );
+  PetscCall( VecRestoreArrayReadAndMemType(ctx->X_t_loc, &x_t) );
+  PetscCall( VecRestoreArrayAndMemType(ctx->Y_loc, &y) );
 
   // Local-to-Global
   PetscCall( VecZeroEntries(Y) );
-  PetscCall( DMLocalToGlobal(ctx->dm, Y_loc, ADD_VALUES, Y) );
+  PetscCall( DMLocalToGlobal(ctx->dm, ctx->Y_loc, ADD_VALUES, Y) );
 
   // Restore vectors
-  PetscCall( DMRestoreLocalVector(ctx->dm, &Y_loc) );
+  PetscCall( DMRestoreLocalVector(ctx->dm, &ctx->Y_loc) );
 
   PetscFunctionReturn(0);
 }

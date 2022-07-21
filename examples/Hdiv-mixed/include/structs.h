@@ -18,6 +18,7 @@ struct AppCtx_ {
   // Problem type arguments
   PetscFunctionList problems;
   char              problem_name[PETSC_MAX_PATH_LEN];
+  CeedContextFieldLabel    solution_time_label;
 };
 
 // 2) richard
