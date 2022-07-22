@@ -28,6 +28,10 @@
 //   ./main -pc_type svd -problem darcy3d -dm_plex_filename /path to the mesh file
 //   ./main -pc_type svd -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4 -bc_pressure 1
 //   ./main -pc_type svd -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4 -bc_pressure 1,2,3,4
+//   ./main -pc_type svd -problem richard2d -dm_plex_dim 2 -dm_plex_box_faces 4,4
+
+#include "ceed/ceed.h"
+#include <stdio.h>
 const char help[] = "Solve H(div)-mixed problem using PETSc and libCEED\n";
 
 #include "main.h"
@@ -76,6 +80,10 @@ int main(int argc, char **argv) {
   Physics phys_ctx;
   PetscCall( PetscCalloc1(1, &phys_ctx) );
 
+  OperatorApplyContext ctx_residual_ut, ctx_initial;
+  PetscCall( PetscCalloc1(1, &ctx_residual_ut) );
+  PetscCall( PetscCalloc1(1, &ctx_initial) );
+
   // ---------------------------------------------------------------------------
   // Process command line options
   // ---------------------------------------------------------------------------
@@ -114,50 +122,52 @@ int main(int argc, char **argv) {
   SetupFE(comm, dm);
 
   // ---------------------------------------------------------------------------
-  // Create local Force vector
-  // ---------------------------------------------------------------------------
-  Vec U_loc;
-  PetscInt U_loc_size;
-  //CeedVector bc_pressure;
-  PetscCall( DMCreateLocalVector(dm, &U_loc) );
-  // Local size for libCEED
-  PetscCall( VecGetSize(U_loc, &U_loc_size) );
-
-  // ---------------------------------------------------------------------------
   // Setup libCEED
   // ---------------------------------------------------------------------------
   // -- Set up libCEED objects
-  PetscCall( SetupLibceed(dm, ceed, app_ctx, problem_data,
-                          U_loc_size, ceed_data) );
+  PetscCall( SetupLibceed(dm, ceed, app_ctx, ctx_residual_ut,
+                          problem_data, ceed_data) );
   //CeedVectorView(force_ceed, "%12.8f", stdout);
   //PetscCall( DMAddBoundariesPressure(ceed, ceed_data, app_ctx, problem_data, dm,
   //                                   bc_pressure) );
 
 
   // ---------------------------------------------------------------------------
+  // Create Global Solution
+  // ---------------------------------------------------------------------------
+  Vec U; // U = [p,u]
+  PetscCall( DMCreateGlobalVector(dm, &U) );
+
+  // ---------------------------------------------------------------------------
   // Setup TSSolve for Richard problem
   // ---------------------------------------------------------------------------
+  TS ts;
+  SNES snes;
+  KSP ksp;
   if (problem_data->has_ts) {
     // ---------------------------------------------------------------------------
     // Create global initial conditions
     // ---------------------------------------------------------------------------
-    Vec U0;
-    CreateInitialConditions(dm, ceed_data, &U0);
-    VecView(U0, PETSC_VIEWER_STDOUT_WORLD);
-    PetscCall( VecDestroy(&U0) );
+
+    SetupResidualOperatorCtx_U0(dm, ceed, ceed_data, ctx_initial);
+    CreateInitialConditions(ceed_data, U, ctx_initial);
+    VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+    SetupResidualOperatorCtx_Ut(dm, ceed, ceed_data, ctx_residual_ut);
+    PetscCall( VecZeroEntries(ctx_residual_ut->X_t_loc) );
+    PetscCall( TSSolveRichard(dm, ceed, ceed_data, app_ctx, ctx_residual_ut,
+                              &U, &ts) );
   }
 
-  // ---------------------------------------------------------------------------
-  // Solve PDE
-  // ---------------------------------------------------------------------------
-  // Create SNES
-  SNES snes;
-  KSP ksp;
-  Vec U;
-  PetscCall( SNESCreate(comm, &snes) );
-  PetscCall( SNESGetKSP(snes, &ksp) );
-  PetscCall( PDESolver(comm, dm, ceed, ceed_data, vec_type, snes, ksp, &U) );
-  //VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+  if (!problem_data->has_ts) {
+    // ---------------------------------------------------------------------------
+    // Solve PDE
+    // ---------------------------------------------------------------------------
+    // Create SNES
+    PetscCall( SNESCreate(comm, &snes) );
+    PetscCall( SNESGetKSP(snes, &ksp) );
+    PetscCall( PDESolver(comm, dm, ceed, ceed_data, vec_type, snes, ksp, &U) );
+    //VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+  }
 
   // ---------------------------------------------------------------------------
   // Compute L2 error of mms problem
@@ -165,13 +175,11 @@ int main(int argc, char **argv) {
   CeedScalar l2_error_u, l2_error_p;
   PetscCall( ComputeL2Error(dm, ceed,ceed_data, U, &l2_error_u,
                             &l2_error_p) );
-
   // ---------------------------------------------------------------------------
   // Print output results
   // ---------------------------------------------------------------------------
-  PetscCall( PrintOutput(ceed, mem_type_backend,
-                         snes, ksp, U, l2_error_u, l2_error_p, app_ctx) );
-
+  PetscCall( PrintOutput(ceed, mem_type_backend, ts,
+                         snes, ksp, U, l2_error_u, l2_error_p, app_ctx, problem_data->has_ts) );
   // ---------------------------------------------------------------------------
   // Save solution (paraview)
   // ---------------------------------------------------------------------------
@@ -188,20 +196,24 @@ int main(int argc, char **argv) {
   // Free PETSc objects
   PetscCall( DMDestroy(&dm) );
   PetscCall( VecDestroy(&U) );
-  PetscCall( VecDestroy(&U_loc) );
-  PetscCall( SNESDestroy(&snes) );
+  if (problem_data->has_ts) {
+    PetscCall( TSDestroy(&ts) );
+  } else {
+    PetscCall( SNESDestroy(&snes) );
+  }
 
   // -- Function list
   PetscCall( PetscFunctionListDestroy(&app_ctx->problems) );
 
+  // Free libCEED objects
+  //CeedVectorDestroy(&bc_pressure);
+  PetscCall( CeedDataDestroy(ceed_data, problem_data) );
   // -- Structs
   PetscCall( PetscFree(app_ctx) );
   PetscCall( PetscFree(problem_data) );
   PetscCall( PetscFree(phys_ctx) );
-
-  // Free libCEED objects
-  //CeedVectorDestroy(&bc_pressure);
-  PetscCall( CeedDataDestroy(ceed_data) );
+  PetscCall( PetscFree(ctx_residual_ut) );
+  PetscCall( PetscFree(ctx_initial) );
   CeedDestroy(&ceed);
 
   return PetscFinalize();

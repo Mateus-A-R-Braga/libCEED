@@ -21,6 +21,7 @@
 #define RICHARD_SYSTEM2D_H
 
 #include <math.h>
+#include "ceed/ceed-f64.h"
 #include "utils.h"
 
 // See Matthew Farthing, Christopher Kees, Cass Miller (2003)
@@ -71,14 +72,13 @@ struct RICHARDContext_ {
   CeedScalar rho_a0;
   CeedScalar alpha_a, b_a;
   CeedScalar beta, p0;
-  CeedScalar t;
+  CeedScalar t, t_final;
   CeedScalar gamma;
 };
 #endif
 // -----------------------------------------------------------------------------
 // Residual evaluation for Richard problem
 // -----------------------------------------------------------------------------
-/*
 CEED_QFUNCTION(RichardSystem2D)(void *ctx, CeedInt Q,
                                 const CeedScalar *const *in,
                                 CeedScalar *const *out) {
@@ -89,8 +89,9 @@ CEED_QFUNCTION(RichardSystem2D)(void *ctx, CeedInt Q,
                    (*u)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2],
                    (*div_u) = (const CeedScalar(*))in[3],
                    (*p) = (const CeedScalar(*))in[4],
-                   (*p_t) = (const CeedScalar(*))in[5],
-                   (*coords) = in[6];
+                   (*f) = in[5],
+                   (*coords) = in[6],
+                   (*p_t) = in[7];
 
   // Outputs
   CeedScalar (*v)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0],
@@ -98,16 +99,14 @@ CEED_QFUNCTION(RichardSystem2D)(void *ctx, CeedInt Q,
              (*q) = (CeedScalar(*))out[2];
   // Context
   RICHARDContext  context = (RICHARDContext)ctx;
-  const CeedScalar kappa   = context->kappa;
-  const CeedScalar alpha_a = context->alpha_a;
-  const CeedScalar b_a     = context->b_a;
+  const CeedScalar kappa    = context->kappa;
   const CeedScalar rho_a0   = context->rho_a0;
-  const CeedScalar beta    = context->beta;
-  const CeedScalar g       = context->g;
-  const CeedScalar p0      = context->p0; // atmospheric pressure
-  CeedScalar t             = context->time;
-  // *INDENT-ON*
-
+  const CeedScalar g        = context->g;
+  const CeedScalar alpha_a  = context->alpha_a;
+  const CeedScalar b_a      = context->b_a;
+  const CeedScalar gamma    = context->gamma;
+  CeedScalar t              = context->t;
+  //printf("time in system Qfunc %f\n", t);
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
@@ -118,16 +117,10 @@ CEED_QFUNCTION(RichardSystem2D)(void *ctx, CeedInt Q,
                                 {dxdX[0][1][i], dxdX[1][1][i]}};
     const CeedScalar det_J = MatDet2x2(J);
 
-    // *INDENT-ON*
-    // \psi = p / (rho_a0 * norm(g))
-    CeedScalar psi = p[i] / (rho_a0 * g);
     // k_r = b_a + alpha_a * (\psi - x2)
-    CeedScalar k_r = b_a + alpha_a * (psi -y);
-    // rho_a = rho_a0*exp(beta * (p - p0))
-    CeedScalar rho_a = rho_a0 * exp(beta * (p[i] - p0));
+    CeedScalar k_r = b_a + alpha_a*(1-x*y);
     // rho = rho_a/rho_a0
-    CeedScalar rho = rho_a/ rho_a0;
-
+    CeedScalar rho = 1.0;
     // (v, K^{-1}/rho*k_r u): v = J^T* (K^{-1}/rho*k_r) *J*u*w/detJ
     // 1) Compute K^{-1}, note K = kappa*I
     CeedScalar K[2][2] = {{kappa, 0.},{0., kappa}};
@@ -147,34 +140,30 @@ CEED_QFUNCTION(RichardSystem2D)(void *ctx, CeedInt Q,
     CeedScalar u1[2] = {u[0][i], u[1][i]}, v1[2];
     AlphaMatVecMult2x2(w[i]/det_J, JT_Kinv_J, u1, v1);
 
-    // 5) -(v, rho*g_u): v2 = -J^T*rho*g_u*w
+    // 5) -(v, rho*g_u): v2 = -J^T*rho*g_u*w, g_u = g/norm(g)
     CeedScalar g_u[2] = {0., 1.}, v2[2];
     AlphaMatTransposeVecMult2x2(-rho*w[i], J, g_u, v2);
 
-    // Output at quadrature points: (v, k*K^{-1} * u) -(v, rho*g)
+    // Output at quadrature points: (v, K^{-1}/rho*k_r u) -(v, rho*g_u)
     for (CeedInt k = 0; k < 2; k++) {
       v[k][i] = v1[k] + v2[k];
     }
     // Output at quadrature points: -(\div(v), \psi)
+    CeedScalar psi = p[i] / (rho_a0 * g);
     div_v[i] = -psi * w[i];
-
-    // Forcing term f = div(u) + alpha_a * d(\psi)/dt
-    CeedScalar f = t*2*PI_DOUBLE*PI_DOUBLE*sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    // Output at quadrature points:
-    //-(q, \div(u))  + (q, f) - alpha_a * (q, d\psi/dt )
-    q[i] = -div_u[i]*w[i] + f*w[i]*det_J - alpha_a*w[i]*det_J;
+    // Output at quadrature points:-(q, \div(u))+(q, f)-alpha_a * (q, d\psi/dt )
+    q[i] = -div_u[i]*w[i] + exp(-gamma*t)*f[i+0*Q]*w[i]*det_J - alpha_a*p_t[i]*w[i]*det_J;
   } // End of Quadrature Point Loop
 
   return 0;
 }
-*/
-/*
+
 // -----------------------------------------------------------------------------
-// Jacobian evaluation for Richard problem
+// Jacobian evaluation for Darcy problem
 // -----------------------------------------------------------------------------
 CEED_QFUNCTION(JacobianRichardSystem2D)(void *ctx, CeedInt Q,
-                                        const CeedScalar *const *in,
-                                        CeedScalar *const *out) {
+                                      const CeedScalar *const *in,
+                                      CeedScalar *const *out) {
   // *INDENT-OFF*
   // Inputs
   const CeedScalar (*w) = in[0],
@@ -182,91 +171,70 @@ CEED_QFUNCTION(JacobianRichardSystem2D)(void *ctx, CeedInt Q,
                    (*du)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2],
                    (*div_du) = (const CeedScalar(*))in[3],
                    (*dp) = (const CeedScalar(*))in[4],
-                   (*coords) = in[5],
-                   (*u)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[6],
-                   (*p) = (const CeedScalar(*))in[7];
+                   (*coords) = in[5];
 
   // Outputs
   CeedScalar (*dv)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0],
              (*div_dv) = (CeedScalar(*))out[1],
              (*dq) = (CeedScalar(*))out[2];
-  // Context
-  RICHARDContext  context = (RICHARDContext)ctx;
-  const CeedScalar kappa  = context->kappa;
-  const CeedScalar alpha_a = context->alpha_a;
-  const CeedScalar b_a     = context->b_a;
-  const CeedScalar rho_a0   = context->rho_a0;
-  const CeedScalar beta    = context->beta;
-  const CeedScalar g       = context->g;
-  const CeedScalar p0      = context->p0;// atmospheric pressure
-  // *INDENT-ON*
 
+  // *INDENT-ON*
+  RICHARDContext  context = (RICHARDContext)ctx;
+  const CeedScalar kappa    = context->kappa;
+  const CeedScalar rho_a0   = context->rho_a0;
+  const CeedScalar g        = context->g;
+  const CeedScalar alpha_a  = context->alpha_a;
+  const CeedScalar b_a      = context->b_a;
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
     // *INDENT-OFF*
     // Setup, J = dx/dX
-    CeedScalar y = coords[i+1*Q];
+    CeedScalar x = coords[i+0*Q], y = coords[i+1*Q];
     const CeedScalar J[2][2] = {{dxdX[0][0][i], dxdX[1][0][i]},
                                 {dxdX[0][1][i], dxdX[1][1][i]}};
     const CeedScalar det_J = MatDet2x2(J);
 
     // *INDENT-ON*
-    // psi = p / (rho_a0 * norm(g))
-    CeedScalar psi = p[i] / (rho_a0 * g);
-    // k_r = b_a + alpha_a * (psi - x2)
-    CeedScalar k_r = b_a + alpha_a * (psi - y);
-    // rho = rho_a0*exp(beta * (p - p0))
-    CeedScalar rho = rho_a0 * exp(beta * (p[i] - p0));
-    //k = rho_a0^2*norm(g)/(rho*k_r)
-    CeedScalar k = rho_a0 * rho_a0 * g / (rho * k_r);
-
-    // Piola map: J^T*k*K^{-1}*J*u*w/detJ
-    // The jacobian term
-    // dv = J^T* (k*K^{-1}) *J*du*w/detJ - [(rho*k_r),p*dp/(rho*k_r)]*J^T*(k*K^{-1}) *J*u*w/detJ
-    //      -J^T * (beta*rho*g)*dp
+    // k_r = b_a + alpha_a * (\psi - x2)
+    CeedScalar k_r = b_a + alpha_a*(1-x*y);
+    // rho = rho_a/rho_a0
+    CeedScalar rho = 1.0;
+    // (dv, K^{-1}/rho*k_r du): dv = J^T* (K^{-1}/rho*k_r) *J*du*w/detJ
     // 1) Compute K^{-1}, note K = kappa*I
     CeedScalar K[2][2] = {{kappa, 0.},{0., kappa}};
     const CeedScalar det_K = MatDet2x2(K);
     CeedScalar K_inv[2][2];
     MatInverse2x2(K, det_K, K_inv);
 
-    // 2) Compute k*K^{-1}*J
-    CeedScalar kKinv_J[2][2];
-    AlphaMatMatMult2x2(k, K_inv, J, kKinv_J);
+    // 2) (K^{-1}/rho*k_r) *J
+    CeedScalar Kinv_J[2][2];
+    AlphaMatMatMult2x2(1/(rho*k_r), K_inv, J, Kinv_J);
 
-    // 3) Compute J^T * (k*K^{-1}*J)
-    CeedScalar JT_kKinv_J[2][2];
-    AlphaMatTransposeMatMult2x2(1, J, kKinv_J, JT_kKinv_J);
+    // 3) Compute J^T* (K^{-1}/rho*k_r) *J
+    CeedScalar JT_Kinv_J[2][2];
+    AlphaMatTransposeMatMult2x2(1, J, Kinv_J, JT_Kinv_J);
 
-    // 4) Compute (J^T*k*K^{-1}*J) * du * w /detJ
+    // 4) Compute dv1 = J^T* (K^{-1}/rho*k_r) *J*du*w/detJ
     CeedScalar du1[2] = {du[0][i], du[1][i]}, dv1[2];
-    AlphaMatVecMult2x2(w[i]/det_J, JT_kKinv_J, du1, dv1);
+    AlphaMatVecMult2x2(w[i]/det_J, JT_Kinv_J, du1, dv1);
 
-    // 5) Compute -(rho*k_r),p*dp/(rho*k_r))
-    // (rho*k_r),p*dp = beta*rho*dp*k_r + rho*alpha*dp/(rho_a0*norm(g))
-    CeedScalar d_rhokr_dp = -(beta + alpha_a/(rho_a0*g*k_r))*dp[i];
+    // 5) -(dv, rho*g_u): dv2 = 0
 
-    // 6) -[(rho*k_r),p*dp/(rho*k_r)]*J^T*(k*K^{-1}) *J*u*w/detJ
-    CeedScalar u1[2] = {u[0][i], u[1][i]}, dv2[2];
-    AlphaMatVecMult2x2((d_rhokr_dp*w[i])/det_J, JT_kKinv_J, u1, dv2);
-
-    // 7) -(v, rho*g): dv = -J^T * (beta*rho*g*dp)*w
-    CeedScalar drho_g_dp[2] = {0., beta *rho *g *dp[i]}, dv3[2];
-    AlphaMatTransposeVecMult2x2(-w[i], J, drho_g_dp, dv3);
-
-    // Output at quadrature points
+    // Output at quadrature points: (dv, K^{-1}/rho*k_r u) -(dv, rho*g_u)
     for (CeedInt k = 0; k < 2; k++) {
-      dv[k][i] = dv1[k] + dv2[k] + dv3[k];
+      dv[k][i] = dv1[k];
     }
-
-    div_dv[i] = -dp[i] * w[i];
+    // Output at quadrature points: -(\div(dv), d\psi)
+    CeedScalar dpsi = dp[i] / (rho_a0 * g);
+    div_dv[i] = -dpsi * w[i];
+    // Output at quadrature points:-(dq, \div(du))
     dq[i] = -div_du[i] * w[i];
   } // End of Quadrature Point Loop
 
   return 0;
 }
-*/
+
 // -----------------------------------------------------------------------------
 
 #endif //End of RICHARD_SYSTEM2D_H
