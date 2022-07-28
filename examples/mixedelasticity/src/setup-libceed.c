@@ -23,7 +23,8 @@ PetscErrorCode CeedDataDestroy(CeedData ceed_data) {
   // Restrictions
   CeedElemRestrictionDestroy(&ceed_data->elem_restr_x);
   CeedElemRestrictionDestroy(&ceed_data->elem_restr_u);
-  CeedElemRestrictionDestroy(&ceed_data->elem_restr_true_soln);
+  CeedElemRestrictionDestroy(&ceed_data->elem_restr_U_i);
+  CeedElemRestrictionDestroy(&ceed_data->elem_restr_f_i);
   CeedElemRestrictionDestroy(&ceed_data->elem_restr_p);
   // Bases
   CeedBasisDestroy(&ceed_data->basis_x);
@@ -31,10 +32,12 @@ PetscErrorCode CeedDataDestroy(CeedData ceed_data) {
   CeedBasisDestroy(&ceed_data->basis_p);
   CeedBasisDestroy(&ceed_data->basis_u_face);
   // QFunctions
+  CeedQFunctionDestroy(&ceed_data->qf_true);
   CeedQFunctionDestroy(&ceed_data->qf_residual);
   CeedQFunctionDestroy(&ceed_data->qf_jacobian);
   CeedQFunctionDestroy(&ceed_data->qf_error);
   // Operators
+  CeedOperatorDestroy(&ceed_data->op_true);
   CeedOperatorDestroy(&ceed_data->op_residual);
   CeedOperatorDestroy(&ceed_data->op_jacobian);
   CeedOperatorDestroy(&ceed_data->op_error);
@@ -128,10 +131,13 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
   CeedElemRestrictionCreateStrided(ceed, num_elem, num_qpts, q_data_size,
                                    num_elem * num_qpts * q_data_size,
                                    CEED_STRIDES_BACKEND, &ceed_data->elem_restr_q_data);
-  // -- restriction for true solution
+  // -- restriction for true solution U=[p,u]
   CeedElemRestrictionCreateStrided(ceed, num_elem, num_qpts, (dim+1),
                                    (dim+1)*num_elem*num_qpts,
-                                   CEED_STRIDES_BACKEND, &ceed_data->elem_restr_true_soln);
+                                   CEED_STRIDES_BACKEND, &ceed_data->elem_restr_U_i);
+  CeedElemRestrictionCreateStrided(ceed, num_elem, num_qpts, dim,
+                                   dim*num_elem*num_qpts,
+                                   CEED_STRIDES_BACKEND, &ceed_data->elem_restr_f_i);
   // ---------------------------------------------------------------------------
   // Get physical coordinates
   // ---------------------------------------------------------------------------
@@ -180,6 +186,36 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
   // -- Cleanup
   CeedQFunctionDestroy(&qf_setup_geo);
   CeedOperatorDestroy(&op_setup_geo);
+
+  // ---------------------------------------------------------------------------
+  // Setup true solution and force
+  // ---------------------------------------------------------------------------
+  CeedVector true_vec, true_force;
+  CeedVectorCreate(ceed, num_elem*num_qpts*(dim+1), &true_vec);
+  CeedVectorCreate(ceed, num_elem*num_qpts*dim, &true_force);
+  // Create the q-function that sets up the RHS and true solution
+  CeedQFunctionCreateInterior(ceed, 1, problem_data->true_solution,
+                              problem_data->true_solution_loc, &ceed_data->qf_true);
+  CeedQFunctionSetContext(ceed_data->qf_true, problem_data->qfunction_context);
+  CeedQFunctionAddInput(ceed_data->qf_true, "x", num_comp_x, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(ceed_data->qf_true, "true force", dim, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(ceed_data->qf_true, "true solution", dim+1,
+                         CEED_EVAL_NONE);
+  // Create the operator that builds the RHS and true solution
+  CeedOperatorCreate(ceed, ceed_data->qf_true, CEED_QFUNCTION_NONE,
+                     CEED_QFUNCTION_NONE,
+                     &ceed_data->op_true);
+  CeedOperatorSetField(ceed_data->op_true, "x", ceed_data->elem_restr_x,
+                       ceed_data->basis_x, ceed_data->x_coord);
+  CeedOperatorSetField(ceed_data->op_true, "true force",
+                       ceed_data->elem_restr_f_i,
+                       CEED_BASIS_COLLOCATED, true_force);
+  CeedOperatorSetField(ceed_data->op_true, "true solution",
+                       ceed_data->elem_restr_U_i,
+                       CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  // Setup RHS and true solution
+  CeedOperatorApply(ceed_data->op_true, ceed_data->x_coord, true_vec,
+                    CEED_REQUEST_IMMEDIATE);
 
   PetscFunctionReturn(0);
 };

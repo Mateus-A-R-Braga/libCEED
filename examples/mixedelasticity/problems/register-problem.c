@@ -27,11 +27,18 @@ PetscErrorCode RegisterProblems_MixedElasticity(AppCtx app_ctx) {
   PetscCall( PetscFunctionListAdd(&app_ctx->problems, "linear2d",
                                   MixedElasticity_LINEAR2D) );
   // 2) linear3d (MixedElasticity_LINEAR3D is created in linear3d.c)
-  PetscCall( PetscFunctionListAdd(&app_ctx->problems, "linear3d",
-                                  MixedElasticity_LINEAR3D) );
+  //PetscCall( PetscFunctionListAdd(&app_ctx->problems, "linear3d",
+  //                                MixedElasticity_LINEAR3D) );
   // 3) ...
 
   // 4) ...
 
   PetscFunctionReturn(0);
+}
+
+// Free a plain data context that was allocated using PETSc; returning libCEED error codes
+int FreeContextPetsc(void *data) {
+  if (PetscFree(data)) return CeedError(NULL, CEED_ERROR_ACCESS,
+                                          "PetscFree failed");
+  return CEED_ERROR_SUCCESS;
 }

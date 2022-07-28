@@ -19,7 +19,7 @@
 
 #include "../include/register-problem.h"
 #include "../qfunctions/volumetric-geometry2d.h"
-#include "../qfunctions/linear-force2d.h"
+#include "../qfunctions/linear-true2d.h"
 #include "../qfunctions/linear-system2d.h"
 #include "../qfunctions/linear-error2d.h"
 #include "../qfunctions/pressure-boundary2d.h"
@@ -27,10 +27,11 @@
 PetscErrorCode MixedElasticity_LINEAR2D(Ceed ceed, ProblemData problem_data,
                                         void *ctx) {
   AppCtx               app_ctx = *(AppCtx *)ctx;
+  PhysicsCtx           phy_ctx;
+  CeedQFunctionContext phy_context;
   PetscFunctionBeginUser;
 
-  // ------------------------------------------------------
-  //               SET UP POISSON_QUAD2D
+  PetscCall( PetscCalloc1(1, &phy_ctx) );
   // ------------------------------------------------------
   problem_data->dim                     = 2;
   problem_data->q_data_size             = 5;
@@ -38,8 +39,8 @@ PetscErrorCode MixedElasticity_LINEAR2D(Ceed ceed, ProblemData problem_data,
   problem_data->quadrature_mode         = CEED_GAUSS;
   problem_data->setup_geo               = SetupVolumeGeometry2D;
   problem_data->setup_geo_loc           = SetupVolumeGeometry2D_loc;
-  problem_data->force                   = LinearForce2D;
-  problem_data->force_loc               = LinearForce2D_loc;
+  problem_data->true_solution           = LinearTrue2D;
+  problem_data->true_solution_loc       = LinearTrue2D_loc;
   problem_data->residual                = LinearSystem2D;
   problem_data->residual_loc            = LinearSystem2D_loc;
   problem_data->jacobian                = JacobianLinearSystem2D;
@@ -52,9 +53,24 @@ PetscErrorCode MixedElasticity_LINEAR2D(Ceed ceed, ProblemData problem_data,
   // ------------------------------------------------------
   //              Command line Options
   // ------------------------------------------------------
+  CeedScalar E = 4., nu = 0.3;
   PetscOptionsBegin(app_ctx->comm, NULL, "Options for mixed-elasticity problem",
                     NULL);
-
+  PetscCall( PetscOptionsScalar("-E", "Young modulus", NULL,
+                                E, &E, NULL));
+  PetscCall( PetscOptionsScalar("-nu", "Poisson ratio", NULL,
+                                nu, &nu, NULL));
   PetscOptionsEnd();
+
+  phy_ctx->E  = E;
+  phy_ctx->nu = nu;
+
+  CeedQFunctionContextCreate(ceed, &phy_context);
+  CeedQFunctionContextSetData(phy_context, CEED_MEM_HOST, CEED_COPY_VALUES,
+                              sizeof(*phy_ctx), phy_ctx);
+  problem_data->qfunction_context = phy_context;
+  CeedQFunctionContextSetDataDestroy(phy_context, CEED_MEM_HOST,
+                                     FreeContextPetsc);
+  PetscCall( PetscFree(phy_ctx) );
   PetscFunctionReturn(0);
 }

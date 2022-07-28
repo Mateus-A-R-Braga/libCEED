@@ -13,11 +13,13 @@ PetscErrorCode MixedElasticity_LINEAR2D(Ceed ceed, ProblemData problem_data,
                                         void *ctx);
 
 // 2) linear3d
-PetscErrorCode MixedElasticity_LINEAR3D(Ceed ceed, ProblemData problem_data,
-                                        void *ctx);
+//PetscErrorCode MixedElasticity_LINEAR3D(Ceed ceed, ProblemData problem_data,
+//                                        void *ctx);
 
 // 3) ...
 
 // 4) ...
+
+extern int FreeContextPetsc(void *);
 
 #endif // register_problem_h
