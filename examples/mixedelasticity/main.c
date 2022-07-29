@@ -118,12 +118,50 @@ int main(int argc, char **argv) {
   //                                   bc_pressure) );
 
   // ---------------------------------------------------------------------------
+  // Create Global Solution
+  // ---------------------------------------------------------------------------
+  Vec U; // U = [p,u]
+  PetscCall( DMCreateGlobalVector(dm, &U) );
+  //VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+
+  // ---------------------------------------------------------------------------
+  // Solve PDE
+  // ---------------------------------------------------------------------------
+  // Create SNES
+  SNES snes;
+  KSP ksp;
+  PetscCall( SNESCreate(comm, &snes) );
+  PetscCall( SNESGetKSP(snes, &ksp) );
+  PetscCall( PDESolver(comm, dm, ceed, ceed_data, vec_type, snes, ksp, &U) );
+  //VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+  // ---------------------------------------------------------------------------
+  // Compute L2 error of mms problem
+  // ---------------------------------------------------------------------------
+  CeedScalar l2_error_u, l2_error_p;
+  PetscCall( ComputeL2Error(dm, ceed,ceed_data, U, &l2_error_u,
+                            &l2_error_p) );
+  // ---------------------------------------------------------------------------
+  // Print output results
+  // ---------------------------------------------------------------------------
+  PetscCall( PrintOutput(ceed, mem_type_backend,
+                         snes, ksp, U, l2_error_u, l2_error_p, app_ctx) );
+
+  // ---------------------------------------------------------------------------
+  // Save solution (paraview)
+  // ---------------------------------------------------------------------------
+  PetscViewer viewer;
+
+  PetscCall( PetscViewerVTKOpen(comm,"solution.vtu",FILE_MODE_WRITE,&viewer) );
+  PetscCall( VecView(U, viewer) );
+  PetscCall( PetscViewerDestroy(&viewer) );
+  // ---------------------------------------------------------------------------
   // Free objects
   // ---------------------------------------------------------------------------
 
   // Free PETSc objects
   PetscCall( DMDestroy(&dm) );
-
+  PetscCall( SNESDestroy(&snes) );
+  PetscCall( VecDestroy(&U) );
   // -- Function list
   PetscCall( PetscFunctionListDestroy(&app_ctx->problems) );
 

@@ -22,7 +22,6 @@
 #include "../qfunctions/linear-true2d.h"
 #include "../qfunctions/linear-system2d.h"
 #include "../qfunctions/linear-error2d.h"
-#include "../qfunctions/pressure-boundary2d.h"
 
 PetscErrorCode MixedElasticity_LINEAR2D(Ceed ceed, ProblemData problem_data,
                                         void *ctx) {
@@ -47,8 +46,6 @@ PetscErrorCode MixedElasticity_LINEAR2D(Ceed ceed, ProblemData problem_data,
   problem_data->jacobian_loc            = JacobianLinearSystem2D_loc;
   problem_data->error                   = LinearError2D;
   problem_data->error_loc               = LinearError2D_loc;
-  problem_data->bc_pressure             = BCPressure2D;
-  problem_data->bc_pressure_loc         = BCPressure2D_loc;
 
   // ------------------------------------------------------
   //              Command line Options

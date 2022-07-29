@@ -18,7 +18,7 @@ struct AppCtx_ {
   // Problem type arguments
   PetscFunctionList problems;
   char              problem_name[PETSC_MAX_PATH_LEN];
-
+  PetscBool         setup_dirichlet;
 };
 
 // PETSc operator contexts
@@ -41,6 +41,7 @@ struct CeedData_ {
   CeedQFunction        qf_true, qf_residual, qf_jacobian, qf_error;
   CeedOperator         op_true, op_residual, op_jacobian, op_error;
   CeedVector           x_ceed, y_ceed, x_coord, q_data;
+  OperatorApplyContext ctx_residual, ctx_jacobian, ctx_error;
 };
 
 // Problem specific data

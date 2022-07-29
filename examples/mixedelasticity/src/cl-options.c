@@ -48,10 +48,12 @@ PetscErrorCode ProcessCommandLineOptions(AppCtx app_ctx) {
   app_ctx->q_extra = 0;
   PetscCall( PetscOptionsInt("-q_extra", "Number of extra quadrature points",
                              NULL, app_ctx->q_extra, &app_ctx->q_extra, NULL) );
+  app_ctx->setup_dirichlet = PETSC_TRUE;
   app_ctx->bc_pressure_count = 16;
   PetscCall( PetscOptionsIntArray("-bc_pressure",
                                   "Face IDs to apply pressure BC",
                                   NULL, app_ctx->bc_pressure_faces, &app_ctx->bc_pressure_count, NULL) );
+
 
   PetscOptionsEnd();
 

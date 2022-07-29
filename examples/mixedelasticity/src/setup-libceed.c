@@ -169,7 +169,7 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
                               problem_data->setup_geo_loc, &qf_setup_geo);
   CeedQFunctionAddInput(qf_setup_geo, "dx", num_comp_x*dim, CEED_EVAL_GRAD);
   CeedQFunctionAddInput(qf_setup_geo, "weight", 1, CEED_EVAL_WEIGHT);
-  CeedQFunctionAddOutput(qf_setup_geo, "qdata", q_data_size, CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(qf_setup_geo, "q_data", q_data_size, CEED_EVAL_NONE);
   // -- Operator
   CeedOperatorCreate(ceed, qf_setup_geo, CEED_QFUNCTION_NONE,
                      CEED_QFUNCTION_NONE, &op_setup_geo);
@@ -177,7 +177,7 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
                        ceed_data->basis_x, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op_setup_geo, "weight", CEED_ELEMRESTRICTION_NONE,
                        ceed_data->basis_x, CEED_VECTOR_NONE);
-  CeedOperatorSetField(op_setup_geo, "qdata",
+  CeedOperatorSetField(op_setup_geo, "q_data",
                        ceed_data->elem_restr_q_data,
                        CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
   // -- Compute the quadrature data
@@ -216,6 +216,123 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
   // Setup RHS and true solution
   CeedOperatorApply(ceed_data->op_true, ceed_data->x_coord, true_vec,
                     CEED_REQUEST_IMMEDIATE);
+
+  // Local residual evaluator
+  // ---------------------------------------------------------------------------
+  // Create the QFunction and Operator that computes the residual of the PDE.
+  // ---------------------------------------------------------------------------
+  // -- QFunction
+  CeedQFunctionCreateInterior(ceed, 1, problem_data->residual,
+                              problem_data->residual_loc, &ceed_data->qf_residual);
+  CeedQFunctionSetContext(ceed_data->qf_residual,
+                          problem_data->qfunction_context);
+  CeedQFunctionAddInput(ceed_data->qf_residual, "dudX", num_comp_u*dim,
+                        CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(ceed_data->qf_residual, "p", 1, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(ceed_data->qf_residual, "q_data", q_data_size,
+                        CEED_EVAL_NONE);
+  CeedQFunctionAddInput(ceed_data->qf_residual, "true force", dim,
+                        CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(ceed_data->qf_residual, "v", dim, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(ceed_data->qf_residual, "dvdX", num_comp_u*dim,
+                         CEED_EVAL_GRAD);
+  CeedQFunctionAddOutput(ceed_data->qf_residual, "q", 1, CEED_EVAL_INTERP);
+
+  // -- Operator
+  CeedOperatorCreate(ceed, ceed_data->qf_residual, CEED_QFUNCTION_NONE,
+                     CEED_QFUNCTION_NONE,
+                     &ceed_data->op_residual);
+  CeedOperatorSetField(ceed_data->op_residual, "dudX", ceed_data->elem_restr_u,
+                       ceed_data->basis_u, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_residual, "p", ceed_data->elem_restr_p,
+                       ceed_data->basis_p, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_residual, "q_data",
+                       ceed_data->elem_restr_q_data,
+                       CEED_BASIS_COLLOCATED, ceed_data->q_data);
+  CeedOperatorSetField(ceed_data->op_residual, "true force",
+                       ceed_data->elem_restr_f_i,
+                       CEED_BASIS_COLLOCATED, true_force);
+  CeedOperatorSetField(ceed_data->op_residual, "v", ceed_data->elem_restr_u,
+                       ceed_data->basis_u, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_residual, "dvdX", ceed_data->elem_restr_u,
+                       ceed_data->basis_u, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_residual, "q", ceed_data->elem_restr_p,
+                       ceed_data->basis_p, CEED_VECTOR_ACTIVE);
+  // -- Save libCEED data to apply operator in matops.c
+
+  // ---------------------------------------------------------------------------
+  // Add Pressure boundary condition. See setup-boundary.c
+  // ---------------------------------------------------------------------------
+  //DMAddBoundariesPressure(ceed, ceed_data, app_ctx, problem_data, dm);
+
+  // Local jacobian evaluator
+  // ---------------------------------------------------------------------------
+  // Create the QFunction and Operator that computes the jacobian of the PDE.
+  // ---------------------------------------------------------------------------
+  // -- QFunction
+  CeedQFunctionCreateInterior(ceed, 1, problem_data->jacobian,
+                              problem_data->jacobian_loc, &ceed_data->qf_jacobian);
+  CeedQFunctionSetContext(ceed_data->qf_jacobian,
+                          problem_data->qfunction_context);
+  CeedQFunctionAddInput(ceed_data->qf_jacobian, "ddudX", num_comp_u*dim,
+                        CEED_EVAL_GRAD);
+  CeedQFunctionAddInput(ceed_data->qf_jacobian, "dp", 1, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(ceed_data->qf_jacobian, "q_data", q_data_size,
+                        CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(ceed_data->qf_jacobian, "dv", dim, CEED_EVAL_INTERP);
+  CeedQFunctionAddOutput(ceed_data->qf_jacobian, "ddvdX", num_comp_u*dim,
+                         CEED_EVAL_GRAD);
+  CeedQFunctionAddOutput(ceed_data->qf_jacobian, "dq", 1, CEED_EVAL_INTERP);
+  // -- Operator
+  CeedOperatorCreate(ceed, ceed_data->qf_jacobian, CEED_QFUNCTION_NONE,
+                     CEED_QFUNCTION_NONE,
+                     &ceed_data->op_jacobian);
+  CeedOperatorSetField(ceed_data->op_jacobian, "ddudX", ceed_data->elem_restr_u,
+                       ceed_data->basis_u, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_jacobian, "dp", ceed_data->elem_restr_p,
+                       ceed_data->basis_p, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_jacobian, "q_data",
+                       ceed_data->elem_restr_q_data,
+                       CEED_BASIS_COLLOCATED, ceed_data->q_data);
+  CeedOperatorSetField(ceed_data->op_jacobian, "dv", ceed_data->elem_restr_u,
+                       ceed_data->basis_u, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_jacobian, "ddvdX", ceed_data->elem_restr_u,
+                       ceed_data->basis_u, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_jacobian, "dq", ceed_data->elem_restr_p,
+                       ceed_data->basis_p, CEED_VECTOR_ACTIVE);
+  // -- Save libCEED data to apply operator in matops.c
+
+  // ---------------------------------------------------------------------------
+  // Setup Error Qfunction
+  // ---------------------------------------------------------------------------
+  // Create the q-function that sets up the error
+  CeedQFunctionCreateInterior(ceed, 1, problem_data->error,
+                              problem_data->error_loc, &ceed_data->qf_error);
+  CeedQFunctionSetContext(ceed_data->qf_error, problem_data->qfunction_context);
+  CeedQFunctionAddInput(ceed_data->qf_error, "q_data", q_data_size,
+                        CEED_EVAL_NONE);
+  CeedQFunctionAddInput(ceed_data->qf_error, "u", dim, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(ceed_data->qf_error, "p", 1, CEED_EVAL_INTERP);
+  CeedQFunctionAddInput(ceed_data->qf_error, "true solution", dim+1,
+                        CEED_EVAL_NONE);
+  CeedQFunctionAddOutput(ceed_data->qf_error, "error", dim+1, CEED_EVAL_NONE);
+  // Create the operator that builds the error
+  CeedOperatorCreate(ceed, ceed_data->qf_error, CEED_QFUNCTION_NONE,
+                     CEED_QFUNCTION_NONE,
+                     &ceed_data->op_error);
+  CeedOperatorSetField(ceed_data->op_error, "q_data",
+                       ceed_data->elem_restr_q_data,
+                       CEED_BASIS_COLLOCATED, ceed_data->q_data);
+  CeedOperatorSetField(ceed_data->op_error, "u", ceed_data->elem_restr_u,
+                       ceed_data->basis_u, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_error, "p", ceed_data->elem_restr_p,
+                       ceed_data->basis_p, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(ceed_data->op_error, "true solution",
+                       ceed_data->elem_restr_U_i,
+                       CEED_BASIS_COLLOCATED, true_vec);
+  CeedOperatorSetField(ceed_data->op_error, "error", ceed_data->elem_restr_U_i,
+                       CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
+  // -- Save libCEED data to apply operator in matops.c
 
   PetscFunctionReturn(0);
 };

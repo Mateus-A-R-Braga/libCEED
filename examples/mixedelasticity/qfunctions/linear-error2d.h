@@ -30,31 +30,20 @@ CEED_QFUNCTION(LinearError2D)(void *ctx, const CeedInt Q,
                               CeedScalar *const *out) {
   // *INDENT-OFF*
   // Inputs
-  const CeedScalar (*w) = in[0], 
-                   (*dxdX)[2][CEED_Q_VLA] = (const CeedScalar(*)[2][CEED_Q_VLA])in[1],
-                   (*u)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[2],
-                   (*p) = (const CeedScalar(*))in[3],
-                   (*target) = in[4];
+  const CeedScalar (*q_data)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[0],
+                   (*u)[CEED_Q_VLA] = (const CeedScalar(*)[CEED_Q_VLA])in[1],
+                   (*p) = (const CeedScalar(*))in[2],
+                   (*target) = in[3];
   // Outputs
   CeedScalar (*error) = out[0];
   // Quadrature Point Loop
   CeedPragmaSIMD
-  for (CeedInt i=0; i<Q; i++) {
-    // Setup, J = dx/dX
-    const CeedScalar J[2][2] = {{dxdX[0][0][i], dxdX[1][0][i]},
-                                {dxdX[0][1][i], dxdX[1][1][i]}};
-    const CeedScalar detJ = J[0][0]*J[1][1] - J[0][1]*J[1][0];             
-    // Compute Piola map:uh = J*u/detJ
-    CeedScalar uh[2];
-    for (CeedInt k = 0; k < 2; k++) {
-      uh[k] = 0;
-      for (CeedInt m = 0; m < 2; m++)
-        uh[k] += J[k][m] * u[m][i]/detJ;
-    }
+  for (CeedInt i=0; i<Q; i++) {          
+    const CeedScalar wdetJ      =   q_data[0][i];
     // Error
-    error[i+0*Q] = (p[i] - target[i+0*Q])*(p[i] - target[i+0*Q])*w[i]*detJ;
-    error[i+1*Q] = (uh[0] - target[i+1*Q])*(uh[0] - target[i+1*Q])*w[i]*detJ;
-    error[i+2*Q] = (uh[1] - target[i+2*Q])*(uh[1] - target[i+2*Q])*w[i]*detJ;
+    error[i+0*Q] = (p[i] - target[i+0*Q])*(p[i] - target[i+0*Q])*wdetJ;
+    error[i+1*Q] = (u[0][i] - target[i+1*Q])*(u[0][i] - target[i+1*Q])*wdetJ;
+    error[i+2*Q] = (u[1][i] - target[i+2*Q])*(u[1][i] - target[i+2*Q])*wdetJ;
   } // End of Quadrature Point Loop
 
   return 0;

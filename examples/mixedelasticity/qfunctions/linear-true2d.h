@@ -26,7 +26,7 @@
 // -----------------------------------------------------------------------------
 // Strong form:
 //  \div(\sigma) + f    = 0      in \Omega
-//  \div(u ) - p/k      = 0      in \Omega
+//  \div(u )     - p/k  = 0      in \Omega
 //  u                   = u_b    on \Gamma_D
 //  \sigma.n            = t_b    on \Gamma_N
 //
@@ -44,8 +44,8 @@
 //   coords: physical coordinate
 //
 // Output:
-//   true_force     : = div(u)
-//   true_solution  : = [\psi, u] where \psi, u are the exact solution solution
+//   true_force     : = -\div(\sigma)
+//   true_solution  : = [p, u] where p, u are the exact solution solution
 // -----------------------------------------------------------------------------
 #ifndef PHYSICS_CTX
 #define PHYSICS_CTX
@@ -73,21 +73,21 @@ CEED_QFUNCTION(LinearTrue2D)(void *ctx, const CeedInt Q,
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
     CeedScalar x = coords[i+0*Q], y = coords[i+1*Q];  
-    CeedScalar u1     = sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    CeedScalar u1_1   = PI_DOUBLE*cos(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    CeedScalar u1_12  = PI_DOUBLE*PI_DOUBLE*cos(PI_DOUBLE*x)*cos(PI_DOUBLE*y);
-    CeedScalar u1_11  = -PI_DOUBLE*PI_DOUBLE*u1;
-    //CeedScalar u1_2   = PI_DOUBLE*sin(PI_DOUBLE*x)*cos(PI_DOUBLE*y);
-    CeedScalar u1_21  = PI_DOUBLE*PI_DOUBLE*cos(PI_DOUBLE*x)*cos(PI_DOUBLE*y);
-    CeedScalar u1_22  = -PI_DOUBLE*PI_DOUBLE*u1;
+    CeedScalar u1     = exp(2*x) * sin(3*y);
+    CeedScalar u1_1   = 2*u1;
+    CeedScalar u1_12  = 6*exp(2*x) * cos(3*y);
+    CeedScalar u1_11  = 4*u1;
+    //CeedScalar u1_2   = 3*exp(2*x) * cos(3*y);
+    CeedScalar u1_21  = 6*exp(2*x) * cos(3*y);
+    CeedScalar u1_22  = -9*u1;
 
-    CeedScalar u2     = x*(1-x)*y*(1-y);
-    //CeedScalar u2_1   = (1-2*x)*y*(1-y);
-    CeedScalar u2_12  = (1-2*x)*(1-2*y);
-    CeedScalar u2_11  = -2*y*(1-y);
-    CeedScalar u2_2   = x*(1-x)*(1-2*y);
-    CeedScalar u2_21  = (1-2*x)*(1-2*y);
-    CeedScalar u2_22  = -2*x*(1-x);
+    CeedScalar u2     = exp(3*y) * sin(4*x);
+    //CeedScalar u2_1   = 4*exp(3*y) * cos(4*x);
+    CeedScalar u2_12  = 12*exp(3*y) * cos(4*x);
+    CeedScalar u2_11  = -16*u2;
+    CeedScalar u2_2   = 3*u2;
+    CeedScalar u2_21  = 12*exp(3*y) * cos(4*x);
+    CeedScalar u2_22  = 9*u2;
 
     CeedScalar p  = k*(u1_1 + u2_2); 
     CeedScalar f1 = -(2*mu/3)*(2*u1_11 - u2_21) - k*(u1_11 + u2_21) - mu*(u1_22 + u2_12);

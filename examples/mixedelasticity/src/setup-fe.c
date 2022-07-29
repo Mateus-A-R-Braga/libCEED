@@ -1,4 +1,5 @@
 #include "../include/setup-fe.h"
+#include "../include/setup-boundary.h"
 
 // ---------------------------------------------------------------------------
 // Set-up FE
@@ -39,6 +40,11 @@ PetscErrorCode SetupFE(ProblemData problem_data,
                                      &fe_coords) );
     PetscCall( DMProjectCoordinates(dm, fe_coords) );
     PetscCall( PetscFEDestroy(&fe_coords) );
+  }
+
+  if (app_ctx->setup_dirichlet) {
+    // Dirichlet boundaries
+    PetscCall(DMAddBoundariesDirichlet(dm));
   }
 
   if (!is_simplex) {
