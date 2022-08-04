@@ -272,6 +272,8 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
                                 problem_data->ics_loc, &ceed_data->qf_ics);
     CeedQFunctionSetContext(ceed_data->qf_ics, problem_data->qfunction_context);
     CeedQFunctionAddInput(ceed_data->qf_ics, "x", num_comp_x, CEED_EVAL_INTERP);
+    CeedQFunctionAddInput(ceed_data->qf_ics, "dx", dim*dim, CEED_EVAL_GRAD);
+    CeedQFunctionAddOutput(ceed_data->qf_ics, "u_0", dim, CEED_EVAL_NONE);
     CeedQFunctionAddOutput(ceed_data->qf_ics, "p_0", 1, CEED_EVAL_NONE);
     // Create the operator that builds the initial conditions
     CeedOperatorCreate(ceed, ceed_data->qf_ics, CEED_QFUNCTION_NONE,
@@ -279,6 +281,10 @@ PetscErrorCode SetupLibceed(DM dm, Ceed ceed, AppCtx app_ctx,
                        &ceed_data->op_ics);
     CeedOperatorSetField(ceed_data->op_ics, "x", ceed_data->elem_restr_x,
                          basis_xc, CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(ceed_data->op_ics, "dx", ceed_data->elem_restr_x,
+                         basis_xc, CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(ceed_data->op_ics, "u_0", ceed_data->elem_restr_u,
+                         CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
     CeedOperatorSetField(ceed_data->op_ics, "p_0", ceed_data->elem_restr_p,
                          CEED_BASIS_COLLOCATED, CEED_VECTOR_ACTIVE);
     // -- Save libCEED data to apply operator in setup-ts.c

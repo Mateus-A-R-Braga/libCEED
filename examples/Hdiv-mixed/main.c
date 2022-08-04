@@ -152,10 +152,10 @@ int main(int argc, char **argv) {
     SetupResidualOperatorCtx_U0(dm, ceed, ceed_data, ctx_initial);
     CreateInitialConditions(ceed_data, U, ctx_initial);
     VecView(U, PETSC_VIEWER_STDOUT_WORLD);
-    SetupResidualOperatorCtx_Ut(dm, ceed, ceed_data, ctx_residual_ut);
-    PetscCall( VecZeroEntries(ctx_residual_ut->X_t_loc) );
-    PetscCall( TSSolveRichard(dm, ceed, ceed_data, app_ctx, ctx_residual_ut,
-                              &U, &ts) );
+    //SetupResidualOperatorCtx_Ut(dm, ceed, ceed_data, ctx_residual_ut);
+    //PetscCall( VecZeroEntries(ctx_residual_ut->X_t_loc) );
+    //PetscCall( TSSolveRichard(dm, ceed, ceed_data, app_ctx, ctx_residual_ut,
+    //                          &U, &ts) );
   }
 
   if (!problem_data->has_ts) {

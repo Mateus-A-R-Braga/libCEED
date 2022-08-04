@@ -76,23 +76,60 @@ CEED_QFUNCTION(RichardICs2D)(void *ctx, const CeedInt Q,
                              CeedScalar *const *out) {
   // *INDENT-OFF*
   // Inputs
-  const CeedScalar (*coords) = in[0];
+  const CeedScalar (*coords) = in[0],
+                   (*dxdX)[2][CEED_Q_VLA] = (const CeedScalar(*)[2][CEED_Q_VLA])in[1];
   // Outputs
-  CeedScalar (*psi_0) = out[0];
+  CeedScalar (*u_0) = out[0], (*psi_0) = out[1];
   // Quadrature Point Loop
-  CeedPragmaSIMD
-  for (CeedInt i=0; i<Q; i++) {
-    // Setup, (x,y) and J = dx/dX
-    CeedScalar x0 = coords[0+0*Q], y0 = coords[0+1*Q];
-    CeedScalar x1 = coords[1+0*Q], y2 = coords[2+1*Q];
-    CeedScalar xc = (x0+x1)/2., yc = (y0+y2)/2.;
-
-    // 1st eq: component 1
-    //u_0[i+0*Q] = 0.;
-    // 1st eq: component 2
-    //u_0[i+1*Q] = 0.;
-    // 2nd eq
-    psi_0[i] = sin(PI_DOUBLE*xc)*sin(PI_DOUBLE*yc);
+  {
+  // Setup, J = dx/dX
+  const CeedScalar J0[2][2] = {{dxdX[0][0][0], dxdX[1][0][0]},
+                               {dxdX[0][1][0], dxdX[1][1][0]}};
+  const CeedScalar J1[2][2] = {{dxdX[0][0][1], dxdX[1][0][1]},
+                               {dxdX[0][1][1], dxdX[1][1][1]}};
+  const CeedScalar J2[2][2] = {{dxdX[0][0][2], dxdX[1][0][2]},
+                               {dxdX[0][1][2], dxdX[1][1][2]}};
+  const CeedScalar J3[2][2] = {{dxdX[0][0][3], dxdX[1][0][3]},
+                               {dxdX[0][1][3], dxdX[1][1][3]}};
+  CeedScalar x0 = coords[0+0*Q], y0 = coords[0+1*Q];
+  CeedScalar x1 = coords[1+0*Q], y1 = coords[1+1*Q];
+  CeedScalar x2 = coords[2+0*Q], y2 = coords[2+1*Q];
+  CeedScalar x3 = coords[3+0*Q], y3 = coords[3+1*Q];
+  CeedScalar xc = (x0+x1)/2., yc = (y0+y2)/2.;
+  CeedScalar ue0[2] = {x0-y0, x0+y0};
+  CeedScalar ue1[2] = {x1-y1, x1+y1};
+  CeedScalar ue2[2] = {x2-y2, x2+y2};
+  CeedScalar ue3[2] = {x3-y3, x3+y3};
+  CeedScalar nl0[2] = {-J0[1][1],J0[0][1]};
+  CeedScalar nb0[2] = {J0[1][0],-J0[0][0]};
+  CeedScalar nr1[2] = {J1[1][1],-J1[0][1]};
+  CeedScalar nb1[2] = {J1[1][0],-J1[0][0]};
+  CeedScalar nl2[2] = {-J2[1][1],J2[0][1]};
+  CeedScalar nt2[2] = {-J2[1][0],J2[0][0]};
+  CeedScalar nr3[2] = {J3[1][1],-J3[0][1]};
+  CeedScalar nt3[2] = {-J3[1][0],J3[0][0]};
+  CeedScalar d0, d1, d2, d3, d4, d5, d6, d7;
+  d0 = ue0[0]*nb0[0]+ue0[1]*nb0[1];
+  d1 = ue1[0]*nb1[0]+ue1[1]*nb1[1];
+  d2 = ue1[0]*nr1[0]+ue1[1]*nr1[1];
+  d3 = ue3[0]*nr3[0]+ue3[1]*nr3[1];
+  d4 = ue2[0]*nt2[0]+ue2[1]*nt2[1];
+  d5 = ue3[0]*nt3[0]+ue3[1]*nt3[1];
+  d6 = ue0[0]*nl0[0]+ue0[1]*nl0[1];
+  d7 = ue2[0]*nl2[0]+ue2[1]*nl2[1];
+  u_0[0] = d0;
+  u_0[1] = d1;
+  u_0[2] = d2;
+  u_0[3] = d3;
+  u_0[4] = d4;
+  u_0[5] = d5;
+  u_0[6] = d6;
+  u_0[7] = d7;
+  // 2nd eq
+  psi_0[0] = sin(PI_DOUBLE*xc)*sin(PI_DOUBLE*yc);
+  psi_0[1] = sin(PI_DOUBLE*xc)*sin(PI_DOUBLE*yc);
+  psi_0[2] = sin(PI_DOUBLE*xc)*sin(PI_DOUBLE*yc);
+  psi_0[3] = sin(PI_DOUBLE*xc)*sin(PI_DOUBLE*yc);
   } // End of Quadrature Point Loop
   return 0;
 }
