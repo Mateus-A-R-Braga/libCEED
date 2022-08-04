@@ -12,7 +12,7 @@ PetscErrorCode SetupResidualOperatorCtx(DM dm, Ceed ceed, CeedData ceed_data,
                                         OperatorApplyContext ctx_residual);
 PetscErrorCode SetupErrorOperatorCtx(DM dm, Ceed ceed, CeedData ceed_data,
                                      OperatorApplyContext ctx_error);
-PetscErrorCode ApplyJacobian(Mat A, Vec X, Vec Y);
+PetscErrorCode ApplyMatOp(Mat A, Vec X, Vec Y);
 PetscErrorCode SNESFormResidual(SNES snes, Vec X, Vec Y, void *ctx);
 PetscErrorCode SNESFormJacobian(SNES snes, Vec U, Mat J, Mat J_pre, void *ctx);
 PetscErrorCode PDESolver(MPI_Comm comm, DM dm, Ceed ceed, CeedData ceed_data,

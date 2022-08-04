@@ -53,7 +53,7 @@ PetscErrorCode SetupErrorOperatorCtx(DM dm, Ceed ceed, CeedData ceed_data,
 // -----------------------------------------------------------------------------
 // This function wraps the libCEED operator for a MatShell
 // -----------------------------------------------------------------------------
-PetscErrorCode ApplyJacobian(Mat A, Vec X, Vec Y) {
+PetscErrorCode ApplyMatOp(Mat A, Vec X, Vec Y) {
   OperatorApplyContext op_apply_ctx;
 
   PetscFunctionBeginUser;
@@ -133,7 +133,7 @@ PetscErrorCode PDESolver(MPI_Comm comm, DM dm, Ceed ceed, CeedData ceed_data,
   PetscCall( MatCreateShell(comm, U_l_size, U_l_size, U_g_size,
                             U_g_size, ceed_data->ctx_jacobian, &mat_jacobian) );
   PetscCall( MatShellSetOperation(mat_jacobian, MATOP_MULT,
-                                  (void (*)(void))ApplyJacobian) );
+                                  (void (*)(void))ApplyMatOp) );
   PetscCall( MatShellSetVecType(mat_jacobian, vec_type) );
 
   // Set SNES residual evaluation function
@@ -166,6 +166,9 @@ PetscErrorCode PDESolver(MPI_Comm comm, DM dm, Ceed ceed, CeedData ceed_data,
   PetscCall( VecDestroy(&ceed_data->ctx_jacobian->X_loc) );
   PetscCall( VecDestroy(&ceed_data->ctx_residual->Y_loc) );
   PetscCall( VecDestroy(&ceed_data->ctx_residual->X_loc) );
+  PetscCall( PetscFree(ceed_data->ctx_jacobian) );
+  PetscCall( PetscFree(ceed_data->ctx_residual) );
+
   PetscFunctionReturn(0);
 };
 
@@ -253,6 +256,7 @@ PetscErrorCode ComputeL2Error(DM dm, Ceed ceed, CeedData ceed_data, Vec U,
   CeedVectorDestroy(&collocated_error_p);
   PetscCall( VecDestroy(&ceed_data->ctx_error->Y_loc) );
   PetscCall( VecDestroy(&ceed_data->ctx_error->X_loc) );
+  PetscCall( PetscFree(ceed_data->ctx_error) );
 
   PetscFunctionReturn(0);
 };

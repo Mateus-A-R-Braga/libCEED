@@ -88,16 +88,20 @@ static int CeedOperatorCheckField(Ceed ceed, CeedQFunctionField qf_field,
     // LCOV_EXCL_STOP
 
   }
+  bool is_oriented;
+  ierr = CeedElemRestrictionIsOriented(r, &is_oriented); CeedChk(ierr);
+  CeedInt scale_r;
+  scale_r = is_oriented ? qf_field->size : 1;
   // Field size
   switch(eval_mode) {
   case CEED_EVAL_NONE:
-    if (size != restr_num_comp)
+    if (size != restr_num_comp*scale_r)
       // LCOV_EXCL_START
       return CeedError(ceed, CEED_ERROR_DIMENSION,
                        "Field '%s' of size %" CeedInt_FMT " and EvalMode %s: ElemRestriction has "
                        CeedInt_FMT " components",
                        qf_field->field_name, qf_field->size, CeedEvalModes[qf_field->eval_mode],
-                       restr_num_comp);
+                       restr_num_comp*scale_r);
     // LCOV_EXCL_STOP
     break;
   case CEED_EVAL_INTERP:

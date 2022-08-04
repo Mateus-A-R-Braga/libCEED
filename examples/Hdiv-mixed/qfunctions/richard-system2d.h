@@ -21,6 +21,7 @@
 #define RICHARD_SYSTEM2D_H
 
 #include <math.h>
+#include <ceed.h>
 #include "utils.h"
 
 // See Matthew Farthing, Christopher Kees, Cass Miller (2003)
@@ -71,7 +72,7 @@ struct RICHARDContext_ {
   CeedScalar rho_a0;
   CeedScalar alpha_a, b_a;
   CeedScalar beta, p0;
-  CeedScalar t;
+  CeedScalar t, t_final;
   CeedScalar gamma;
 };
 #endif

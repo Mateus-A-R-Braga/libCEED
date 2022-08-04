@@ -21,7 +21,7 @@
 #include "../qfunctions/darcy-true2d.h"
 #include "../qfunctions/darcy-system2d.h"
 #include "../qfunctions/darcy-error2d.h"
-#include "../qfunctions/pressure-boundary2d.h"
+//#include "../qfunctions/pressure-boundary2d.h"
 
 PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   AppCtx               app_ctx = *(AppCtx *)ctx;
@@ -47,8 +47,8 @@ PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   problem_data->jacobian_loc            = JacobianDarcySystem2D_loc;
   problem_data->error                   = DarcyError2D;
   problem_data->error_loc               = DarcyError2D_loc;
-  problem_data->bc_pressure             = BCPressure2D;
-  problem_data->bc_pressure_loc         = BCPressure2D_loc;
+  //problem_data->bc_pressure             = BCPressure2D;
+  //problem_data->bc_pressure_loc         = BCPressure2D_loc;
   problem_data->has_ts                  = PETSC_FALSE;
 
   // ------------------------------------------------------
@@ -77,9 +77,9 @@ PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   CeedQFunctionContextCreate(ceed, &darcy_context);
   CeedQFunctionContextSetData(darcy_context, CEED_MEM_HOST, CEED_COPY_VALUES,
                               sizeof(*darcy_ctx), darcy_ctx);
-  problem_data->qfunction_context = darcy_context;
   CeedQFunctionContextSetDataDestroy(darcy_context, CEED_MEM_HOST,
                                      FreeContextPetsc);
-  PetscCall( PetscFree(darcy_ctx) );
+  problem_data->qfunction_context = darcy_context;
+
   PetscFunctionReturn(0);
 }

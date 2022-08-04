@@ -21,7 +21,7 @@
 #define DARCY_SYSTEM2D_H
 
 #include <math.h>
-#include "ceed/ceed-f64.h"
+#include <ceed.h>
 #include "utils.h"
 
 // -----------------------------------------------------------------------------

@@ -1,45 +1,220 @@
 #include "../include/setup-ts.h"
 #include "../include/setup-matops.h"
 #include "../include/setup-libceed.h"
+#include "../include/setup-solvers.h"
+#include "ceed/ceed.h"
 #include "petscerror.h"
+#include "petscsystypes.h"
+#include <stdio.h>
 
+
+// -----------------------------------------------------------------------------
+// Setup operator context data for Richard problem, u field
+// -----------------------------------------------------------------------------
+PetscErrorCode SetupResidualOperatorCtx_U0(MPI_Comm comm, DM dm_u0, Ceed ceed,
+    CeedData ceed_data,
+    OperatorApplyContext ctx_initial_u0) {
+  PetscFunctionBeginUser;
+
+  ctx_initial_u0->comm = comm;
+  ctx_initial_u0->dm = dm_u0;
+  PetscCall( DMCreateLocalVector(dm_u0, &ctx_initial_u0->X_loc) );
+  PetscCall( VecDuplicate(ctx_initial_u0->X_loc, &ctx_initial_u0->Y_loc) );
+  ctx_initial_u0->x_ceed = ceed_data->u0_ceed;
+  ctx_initial_u0->y_ceed = ceed_data->v0_ceed;
+  ctx_initial_u0->ceed = ceed;
+  ctx_initial_u0->op_apply = ceed_data->op_ics_u;
+
+  PetscFunctionReturn(0);
+}
+
+// -----------------------------------------------------------------------------
+// Setup operator context data for Richard problem, u field
+// -----------------------------------------------------------------------------
+PetscErrorCode SetupResidualOperatorCtx_P0(MPI_Comm comm, DM dm_p0, Ceed ceed,
+    CeedData ceed_data,
+    OperatorApplyContext ctx_initial_p0) {
+  PetscFunctionBeginUser;
+
+  ctx_initial_p0->comm = comm;
+  ctx_initial_p0->dm = dm_p0;
+  PetscCall( DMCreateLocalVector(dm_p0, &ctx_initial_p0->X_loc) );
+  PetscCall( VecDuplicate(ctx_initial_p0->X_loc, &ctx_initial_p0->Y_loc) );
+  ctx_initial_p0->x_ceed = ceed_data->p0_ceed;
+  ctx_initial_p0->y_ceed = ceed_data->q0_ceed;
+  ctx_initial_p0->ceed = ceed;
+  ctx_initial_p0->op_apply = ceed_data->op_ics_p;
+
+  PetscFunctionReturn(0);
+}
 
 // -----------------------------------------------------------------------------
 // Create global initial conditions vector
 // -----------------------------------------------------------------------------
-PetscErrorCode CreateInitialConditions(DM dm, CeedData ceed_data, Vec *U0) {
-
-  PetscScalar *u0;
-  PetscMemType u0_mem_type;
-  Vec U0_loc;
+PetscErrorCode CreateInitialConditions(DM dm, DM dm_u0, DM dm_p0,
+                                       CeedData ceed_data,
+                                       Vec U, VecType vec_type,
+                                       OperatorApplyContext ctx_initial_u0,
+                                       OperatorApplyContext ctx_initial_p0) {
 
   PetscFunctionBeginUser;
+  // ----------------------------------------------
+  // Create local rhs for u field
+  // ----------------------------------------------
+  Vec rhs_u_loc;
+  PetscScalar *ru;
+  PetscMemType ru_mem_type;
+  PetscCall( DMCreateLocalVector(dm_u0, &rhs_u_loc) );
+  PetscCall( VecZeroEntries(rhs_u_loc) );
+  PetscCall( VecGetArrayAndMemType(rhs_u_loc, &ru, &ru_mem_type) );
+  CeedElemRestrictionCreateVector(ceed_data->elem_restr_u0,
+                                  &ceed_data->rhs_u0_ceed,
+                                  NULL);
+  CeedVectorSetArray(ceed_data->rhs_u0_ceed, MemTypeP2C(ru_mem_type),
+                     CEED_USE_POINTER, ru);
 
-  PetscCall( DMCreateLocalVector(dm, &U0_loc) );
-  PetscCall( VecZeroEntries(U0_loc) );
+  // Apply operator to create RHS for u field
+  CeedOperatorApply(ceed_data->op_rhs_u0, ceed_data->x_coord,
+                    ceed_data->rhs_u0_ceed, CEED_REQUEST_IMMEDIATE);
 
-  PetscCall( VecGetArrayAndMemType(U0_loc, &u0, &u0_mem_type) );
-  CeedVectorSetArray(ceed_data->U0_ceed, MemTypeP2C(u0_mem_type),
-                     CEED_USE_POINTER, u0);
-  // Apply libCEED operator
-  CeedOperatorApply(ceed_data->op_ics, ceed_data->x_coord, ceed_data->U0_ceed,
-                    CEED_REQUEST_IMMEDIATE);
-  // Restore PETSc vectors
-  CeedVectorTakeArray(ceed_data->U0_ceed, MemTypeP2C(u0_mem_type), NULL);
-  PetscCall( VecRestoreArrayAndMemType(U0_loc, &u0) );
+  // ----------------------------------------------
+  // Create global rhs for u field
+  // ----------------------------------------------
+  Vec rhs_u0;
+  CeedVectorTakeArray(ceed_data->rhs_u0_ceed, MemTypeP2C(ru_mem_type), NULL);
+  PetscCall( VecRestoreArrayAndMemType(rhs_u_loc, &ru) );
+  PetscCall( DMCreateGlobalVector(dm_u0, &rhs_u0) );
+  PetscCall( VecZeroEntries(rhs_u0) );
+  PetscCall( DMLocalToGlobal(dm_u0, rhs_u_loc, ADD_VALUES, rhs_u0) );
 
-  // Create global initial conditions
-  PetscCall( DMCreateGlobalVector(dm, U0) );
-  PetscCall( VecZeroEntries(*U0) );
-  // Local-to-global
-  PetscCall( DMLocalToGlobal(dm, U0_loc, ADD_VALUES, *U0) );
+  // ----------------------------------------------
+  // Solve for U0, M*U0 = rhs_u0
+  // ----------------------------------------------
+  Vec U0;
+  PetscCall( DMCreateGlobalVector(dm_u0, &U0) );
+  PetscCall( VecZeroEntries(U0) );
+  PetscInt U0_g_size, U0_l_size;
+  PetscCall( VecGetSize(U0, &U0_g_size) );
+  // Local size for matShell
+  PetscCall( VecGetLocalSize(U0, &U0_l_size) );
 
-  // -- Cleanup
-  CeedVectorDestroy(&ceed_data->U0_ceed);
-  CeedQFunctionDestroy(&ceed_data->qf_ics);
-  CeedOperatorDestroy(&ceed_data->op_ics);
-  // Free PETSc objects
-  PetscCall( VecDestroy(&U0_loc) );
+  // Operator
+  Mat mat_ksp_u0;
+  // -- Form Action of residual on u
+  PetscCall( MatCreateShell(ctx_initial_u0->comm, U0_l_size, U0_l_size, U0_g_size,
+                            U0_g_size, ceed_data->ctx_initial_u0, &mat_ksp_u0) );
+  PetscCall( MatShellSetOperation(mat_ksp_u0, MATOP_MULT,
+                                  (void (*)(void))ApplyMatOp) );
+  PetscCall( MatShellSetVecType(mat_ksp_u0, vec_type) );
+
+  KSP ksp_u0;
+  PetscCall( KSPCreate(ctx_initial_u0->comm, &ksp_u0) );
+  PetscCall( KSPSetOperators(ksp_u0, mat_ksp_u0, mat_ksp_u0) );
+  PetscCall( KSPSetFromOptions(ksp_u0) );
+  PetscCall( KSPSetUp(ksp_u0) );
+  PetscCall( KSPSolve(ksp_u0, rhs_u0, U0) );
+
+  // ----------------------------------------------
+  // Create local rhs for p field
+  // ----------------------------------------------
+  Vec rhs_p_loc;
+  PetscScalar *rp;
+  PetscMemType rp_mem_type;
+  PetscCall( DMCreateLocalVector(dm_p0, &rhs_p_loc) );
+  PetscCall( VecZeroEntries(rhs_p_loc) );
+  PetscCall( VecGetArrayAndMemType(rhs_p_loc, &rp, &rp_mem_type) );
+  CeedElemRestrictionCreateVector(ceed_data->elem_restr_p0,
+                                  &ceed_data->rhs_p0_ceed,
+                                  NULL);
+  CeedVectorSetArray(ceed_data->rhs_p0_ceed, MemTypeP2C(rp_mem_type),
+                     CEED_USE_POINTER, rp);
+
+  // Apply operator to create RHS for p field
+  CeedOperatorApply(ceed_data->op_rhs_p0, ceed_data->x_coord,
+                    ceed_data->rhs_p0_ceed, CEED_REQUEST_IMMEDIATE);
+
+  // ----------------------------------------------
+  // Create global rhs for p field
+  // ----------------------------------------------
+  Vec rhs_p0;
+  CeedVectorTakeArray(ceed_data->rhs_p0_ceed, MemTypeP2C(rp_mem_type), NULL);
+  PetscCall( VecRestoreArrayAndMemType(rhs_p_loc, &rp) );
+  PetscCall( DMCreateGlobalVector(dm_p0, &rhs_p0) );
+  PetscCall( VecZeroEntries(rhs_p0) );
+  PetscCall( DMLocalToGlobal(dm_p0, rhs_p_loc, ADD_VALUES, rhs_p0) );
+
+  // ----------------------------------------------
+  // Solve for P0, M*P0 = rhs_p0
+  // ----------------------------------------------
+  Vec P0;
+  PetscCall( DMCreateGlobalVector(dm_p0, &P0) );
+  PetscCall( VecZeroEntries(P0) );
+  PetscInt P0_g_size, P0_l_size;
+  PetscCall( VecGetSize(P0, &P0_g_size) );
+  // Local size for matShell
+  PetscCall( VecGetLocalSize(P0, &P0_l_size) );
+
+  // Operator
+  Mat mat_ksp_p0;
+  // -- Form Action of residual on u
+  PetscCall( MatCreateShell(ctx_initial_p0->comm, P0_l_size, P0_l_size, P0_g_size,
+                            P0_g_size, ceed_data->ctx_initial_p0, &mat_ksp_p0) );
+  PetscCall( MatShellSetOperation(mat_ksp_p0, MATOP_MULT,
+                                  (void (*)(void))ApplyMatOp) );
+  PetscCall( MatShellSetVecType(mat_ksp_p0, vec_type) );
+
+  KSP ksp_p0;
+  PetscCall( KSPCreate(ctx_initial_p0->comm, &ksp_p0) );
+  PetscCall( KSPSetOperators(ksp_p0, mat_ksp_p0, mat_ksp_p0) );
+  PetscCall( KSPSetFromOptions(ksp_p0) );
+  PetscCall( KSPSetUp(ksp_p0) );
+  PetscCall( KSPSolve(ksp_p0, rhs_p0, P0) );
+
+  // ----------------------------------------------
+  // Create final initial conditions U
+  // ----------------------------------------------
+  Vec U_loc;
+  PetscScalar *u;
+  PetscCall( DMCreateLocalVector(dm, &U_loc) );
+  PetscInt U_l_size;
+  PetscCall( VecGetLocalSize(U, &U_l_size) );
+  // Global-to-local
+  PetscCall( DMGlobalToLocal(ctx_initial_u0->dm, U0, INSERT_VALUES,
+                             ctx_initial_u0->X_loc) );
+  PetscCall( DMGlobalToLocal(ctx_initial_p0->dm, P0, INSERT_VALUES,
+                             ctx_initial_p0->X_loc) );
+
+  const PetscScalar *u0, *p0;
+  PetscCall( VecGetArrayRead(ctx_initial_u0->X_loc, &u0) );
+  PetscCall( VecGetArrayRead(ctx_initial_p0->X_loc, &p0) );
+  PetscCall( VecGetArray(U_loc, &u) );
+  for (PetscInt i = 0; i<ceed_data->num_elem; i++) {
+    u[i] = p0[i];
+  }
+  for (PetscInt i = ceed_data->num_elem; i<U_l_size; i++) {
+    u[i] = u0[i-ceed_data->num_elem];
+  }
+  PetscCall( VecRestoreArray(U_loc, &u) );
+  PetscCall( VecRestoreArrayRead(ctx_initial_p0->X_loc, &p0) );
+  PetscCall( VecRestoreArrayRead(ctx_initial_u0->X_loc, &u0) );
+  PetscCall( DMLocalToGlobal(dm, U_loc, ADD_VALUES,
+                             U) );
+
+  // Clean up
+  PetscCall( VecDestroy(&rhs_u_loc) );
+  PetscCall( VecDestroy(&rhs_u0) );
+  PetscCall( VecDestroy(&U0) );
+  PetscCall( VecDestroy(&ctx_initial_u0->X_loc) );
+  PetscCall( VecDestroy(&ctx_initial_u0->Y_loc) );
+  PetscCall( VecDestroy(&rhs_p_loc) );
+  PetscCall( VecDestroy(&rhs_p0) );
+  PetscCall( VecDestroy(&P0) );
+  PetscCall( VecDestroy(&ctx_initial_p0->X_loc) );
+  PetscCall( VecDestroy(&ctx_initial_p0->Y_loc) );
+  PetscCall( MatDestroy(&mat_ksp_p0) );
+  PetscCall( MatDestroy(&mat_ksp_u0) );
+  PetscCall( KSPDestroy(&ksp_p0) );
+  PetscCall( KSPDestroy(&ksp_u0) );
   PetscFunctionReturn(0);
 
 }

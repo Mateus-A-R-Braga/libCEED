@@ -21,6 +21,7 @@
 #define RICHARD_TRUE2D_H
 
 #include <math.h>
+#include <ceed.h>
 #include "utils.h"
 
 // See Matthew Farthing, Christopher Kees, Cass Miller (2003)
@@ -64,36 +65,10 @@ struct RICHARDContext_ {
   CeedScalar rho_a0;
   CeedScalar alpha_a, b_a;
   CeedScalar beta, p0;
-  CeedScalar t;
+  CeedScalar t, t_final;
   CeedScalar gamma;
 };
 #endif
-// -----------------------------------------------------------------------------
-// Initial conditions for Richard problem
-// -----------------------------------------------------------------------------
-CEED_QFUNCTION(RichardICs2D)(void *ctx, const CeedInt Q,
-                             const CeedScalar *const *in,
-                             CeedScalar *const *out) {
-  // *INDENT-OFF*
-  // Inputs
-  const CeedScalar (*coords) = in[0];
-  // Outputs
-  CeedScalar (*u_0) = out[0], (*psi_0) = out[1];
-  // Quadrature Point Loop
-  CeedPragmaSIMD
-  for (CeedInt i=0; i<Q; i++) {
-    // Setup, (x,y) and J = dx/dX
-    CeedScalar x = coords[i+0*Q], y = coords[i+1*Q];
-
-    // 1st eq: component 1
-    u_0[i+0*Q] = 0.;
-    // 1st eq: component 2
-    u_0[i+1*Q] = 0.;
-    // 2nd eq
-    psi_0[i] = sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-  } // End of Quadrature Point Loop
-  return 0;
-}
 
 // -----------------------------------------------------------------------------
 // True solution for Richard problem
@@ -111,16 +86,20 @@ CEED_QFUNCTION(RichardTrue2D)(void *ctx, const CeedInt Q,
   const CeedScalar kappa    = context->kappa;
   const CeedScalar alpha_a  = context->alpha_a;
   const CeedScalar b_a      = context->b_a;
-  const CeedScalar gamma   = context->gamma;
-  CeedScalar t             = context->t;
-  printf("time %f \n", t);
+  const CeedScalar gamma    = context->gamma;
+  CeedScalar t_final        = context->t_final;
+
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
     CeedScalar x = coords[i+0*Q], y = coords[i+1*Q];
-    CeedScalar psi    = exp(-gamma*t)*sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    CeedScalar psi_x  = PI_DOUBLE*exp(-gamma*t)*cos(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    CeedScalar psi_y  = PI_DOUBLE*exp(-gamma*t)*sin(PI_DOUBLE*x)*cos(PI_DOUBLE*y);
+    // psi = exp(-gamma*t)*sin(pi*x)*sin(pi*y)
+    CeedScalar psi1 = sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
+    CeedScalar psi    = exp(-gamma*t_final)*psi1;
+    CeedScalar psi1_x = PI_DOUBLE*cos(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
+    CeedScalar psi_x  = exp(-gamma*t_final)*psi1_x;
+    CeedScalar psi1_y = PI_DOUBLE*sin(PI_DOUBLE*x)*cos(PI_DOUBLE*y);
+    CeedScalar psi_y  = exp(-gamma*t_final)*psi1_y;
 
     // k_r = b_a + alpha_a * (1 - x*y)
     CeedScalar k_r = b_a + alpha_a*(1-x*y);
@@ -128,11 +107,15 @@ CEED_QFUNCTION(RichardTrue2D)(void *ctx, const CeedInt Q,
     CeedScalar rho = 1.;
     // u = -rho*k_r*K *[grad(\psi) - rho*g_u]
     CeedScalar u[2] = {-rho*k_r*kappa*psi_x, -rho*k_r*kappa*(psi_y-1)};
-    CeedScalar div_u = -rho*kappa*(-alpha_a*y*psi_x - k_r*PI_DOUBLE*PI_DOUBLE*psi
-                                   -alpha_a*x*psi_y - k_r*PI_DOUBLE*PI_DOUBLE*psi);
+    // we factor out exp() term and applied in residual function richard-system2d.h
+    CeedScalar div_u1 = -rho*kappa*(-alpha_a*y*psi1_x - k_r*PI_DOUBLE*PI_DOUBLE*psi1
+                                   -alpha_a*x*psi1_y - k_r*PI_DOUBLE*PI_DOUBLE*psi1);
 
     // True Force: f = \div(u) + d (rho*theta)/dt
-    true_force[i+0*Q] = div_u -alpha_a*gamma*psi;
+    // since the force is a function of time, and this qfunction get called once
+    // and the t variable doesn't get updated, we factored exp() term and update it
+    // in residual, thats why we have psi = exp() * psi1, ...
+    true_force[i+0*Q] = div_u1 -alpha_a*gamma*psi1;
     // True Solution
     true_solution[i+0*Q] = psi;
     true_solution[i+1*Q] = u[0];
