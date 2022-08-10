@@ -99,13 +99,16 @@ PetscErrorCode Hdiv_RICHARD2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   CeedQFunctionContextCreate(ceed, &richard_context);
   CeedQFunctionContextSetData(richard_context, CEED_MEM_HOST, CEED_COPY_VALUES,
                               sizeof(*richard_ctx), richard_ctx);
-  CeedQFunctionContextSetDataDestroy(richard_context, CEED_MEM_HOST,
-                                     FreeContextPetsc);
+  //CeedQFunctionContextSetDataDestroy(richard_context, CEED_MEM_HOST,
+  //                                   FreeContextPetsc);
   CeedQFunctionContextRegisterDouble(richard_context, "time",
                                      offsetof(struct RICHARDContext_, t), 1, "current solver time");
   CeedQFunctionContextRegisterDouble(richard_context, "final_time",
                                      offsetof(struct RICHARDContext_, t_final), 1, "final time");
-  problem_data->qfunction_context = richard_context;
+  problem_data->true_qfunction_ctx = richard_context;
+  CeedQFunctionContextReferenceCopy(richard_context,
+                                    &problem_data->rhs_u0_qfunction_ctx);
+
   PetscCall( PetscFree(richard_ctx) );
 
   PetscFunctionReturn(0);

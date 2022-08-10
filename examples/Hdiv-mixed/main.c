@@ -146,11 +146,14 @@ int main(int argc, char **argv) {
     // ---------------------------------------------------------------------------
     SetupResidualOperatorCtx_U0(comm, dm_u0, ceed, ceed_data,
                                 ceed_data->ctx_initial_u0);
-    SetupResidualOperatorCtx_P0(comm, dm_u0, ceed, ceed_data,
+    SetupResidualOperatorCtx_P0(comm, dm_p0, ceed, ceed_data,
                                 ceed_data->ctx_initial_p0);
-    CreateInitialConditions(dm, dm_u0, dm_p0, ceed_data, U, vec_type,
+    SetupResidualOperatorCtx_Ut(comm, dm, ceed, ceed_data,
+                                ceed_data->ctx_residual_ut);
+    CreateInitialConditions(ceed_data, U, vec_type,
                             ceed_data->ctx_initial_u0,
-                            ceed_data->ctx_initial_p0);
+                            ceed_data->ctx_initial_p0,
+                            ceed_data->ctx_residual_ut);
     VecView(U, PETSC_VIEWER_STDOUT_WORLD);
   }
 

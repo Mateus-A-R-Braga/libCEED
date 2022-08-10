@@ -44,6 +44,8 @@ PetscErrorCode CeedDataDestroy(CeedData ceed_data, ProblemData problem_data) {
     CeedVectorDestroy(&ceed_data->v0_ceed);
     CeedVectorDestroy(&ceed_data->p0_ceed);
     CeedVectorDestroy(&ceed_data->q0_ceed);
+    CeedVectorDestroy(&ceed_data->rhs_u0_ceed);
+    CeedVectorDestroy(&ceed_data->rhs_p0_ceed);
     CeedQFunctionDestroy(&ceed_data->qf_rhs_u0);
     CeedOperatorDestroy(&ceed_data->op_rhs_u0);
     CeedQFunctionDestroy(&ceed_data->qf_ics_u);
@@ -336,8 +338,8 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
   // Create the q-function that sets up the RHS and true solution
   CeedQFunctionCreateInterior(ceed, 1, problem_data->true_solution,
                               problem_data->true_solution_loc, &qf_true);
-  CeedQFunctionSetContext(qf_true, problem_data->qfunction_context);
-  //CeedQFunctionContextDestroy(&problem_data->qfunction_context);
+  CeedQFunctionSetContext(qf_true, problem_data->true_qfunction_ctx);
+  CeedQFunctionContextDestroy(&problem_data->true_qfunction_ctx);
   CeedQFunctionAddInput(qf_true, "x", num_comp_x, CEED_EVAL_INTERP);
   CeedQFunctionAddOutput(qf_true, "true force", 1, CEED_EVAL_NONE);
   CeedQFunctionAddOutput(qf_true, "true solution", dim+1, CEED_EVAL_NONE);
@@ -345,8 +347,7 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
   CeedOperatorCreate(ceed, qf_true, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
                      &op_true);
   if (problem_data->has_ts) {
-    //double final_time = app_ctx->t_final;
-    double final_time = 0.;
+    double final_time = app_ctx->t_final;
     CeedOperatorContextGetFieldLabel(op_true, "final_time",
                                      &ceed_data->ctx_residual_ut->final_time_label);
     CeedOperatorContextSetDouble(op_true,
@@ -374,7 +375,8 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
     // Create the q-function that sets up the RHS
     CeedQFunctionCreateInterior(ceed, 1, problem_data->rhs_u0,
                                 problem_data->rhs_u0_loc, &qf_rhs_u0);
-    CeedQFunctionSetContext(qf_rhs_u0, problem_data->qfunction_context);
+    CeedQFunctionSetContext(qf_rhs_u0, problem_data->rhs_u0_qfunction_ctx);
+    CeedQFunctionContextDestroy(&problem_data->rhs_u0_qfunction_ctx);
     CeedQFunctionAddInput(qf_rhs_u0, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_rhs_u0, "x", num_comp_x, CEED_EVAL_INTERP);
     CeedQFunctionAddInput(qf_rhs_u0, "dx", dim*dim, CEED_EVAL_GRAD);
@@ -401,7 +403,6 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
     CeedOperator  op_ics_u;
     CeedQFunctionCreateInterior(ceed, 1, problem_data->ics_u,
                                 problem_data->ics_u_loc, &qf_ics_u);
-    CeedQFunctionSetContext(qf_ics_u, problem_data->qfunction_context);
     CeedQFunctionAddInput(qf_ics_u, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_ics_u, "dx", dim*dim, CEED_EVAL_GRAD);
     CeedQFunctionAddInput(qf_ics_u, "u", dim, CEED_EVAL_INTERP);
@@ -433,7 +434,6 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
     // Create the q-function that sets up the RHS
     CeedQFunctionCreateInterior(ceed, 1, problem_data->rhs_p0,
                                 problem_data->rhs_p0_loc, &qf_rhs_p0);
-    CeedQFunctionSetContext(qf_rhs_p0, problem_data->qfunction_context);
     CeedQFunctionAddInput(qf_rhs_p0, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_rhs_p0, "x", num_comp_x, CEED_EVAL_INTERP);
     CeedQFunctionAddInput(qf_rhs_p0, "dx", dim*dim, CEED_EVAL_GRAD);
@@ -460,7 +460,6 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
     CeedOperator  op_ics_p;
     CeedQFunctionCreateInterior(ceed, 1, problem_data->ics_p,
                                 problem_data->ics_p_loc, &qf_ics_p);
-    CeedQFunctionSetContext(qf_ics_p, problem_data->qfunction_context);
     CeedQFunctionAddInput(qf_ics_p, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_ics_p, "dx", dim*dim, CEED_EVAL_GRAD);
     CeedQFunctionAddInput(qf_ics_p, "p", 1, CEED_EVAL_INTERP);
@@ -503,8 +502,8 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
     // -- QFunction
     CeedQFunctionCreateInterior(ceed, 1, problem_data->residual,
                                 problem_data->residual_loc, &qf_residual);
-    CeedQFunctionSetContext(qf_residual, problem_data->qfunction_context);
-    //CeedQFunctionContextDestroy(&problem_data->qfunction_context);
+    CeedQFunctionSetContext(qf_residual, problem_data->residual_qfunction_ctx);
+    CeedQFunctionContextDestroy(&problem_data->residual_qfunction_ctx);
     CeedQFunctionAddInput(qf_residual, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_residual, "dx", dim*dim, CEED_EVAL_GRAD);
     CeedQFunctionAddInput(qf_residual, "u", dim, CEED_EVAL_INTERP);
@@ -555,8 +554,8 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
     // -- QFunction
     CeedQFunctionCreateInterior(ceed, 1, problem_data->jacobian,
                                 problem_data->jacobian_loc, &qf_jacobian);
-    CeedQFunctionSetContext(qf_jacobian, problem_data->qfunction_context);
-    //CeedQFunctionContextDestroy(&problem_data->qfunction_context);
+    CeedQFunctionSetContext(qf_jacobian, problem_data->jacobian_qfunction_ctx);
+    CeedQFunctionContextDestroy(&problem_data->jacobian_qfunction_ctx);
     CeedQFunctionAddInput(qf_jacobian, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_jacobian, "dx", dim*dim, CEED_EVAL_GRAD);
     CeedQFunctionAddInput(qf_jacobian, "du", dim, CEED_EVAL_INTERP);
@@ -603,7 +602,8 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
     // Create the q-function that sets up the error
     CeedQFunctionCreateInterior(ceed, 1, problem_data->error,
                                 problem_data->error_loc, &qf_error);
-    CeedQFunctionSetContext(qf_error, problem_data->qfunction_context);
+    CeedQFunctionSetContext(qf_error, problem_data->error_qfunction_ctx);
+    CeedQFunctionContextDestroy(&problem_data->error_qfunction_ctx);
     CeedQFunctionAddInput(qf_error, "weight", 1, CEED_EVAL_WEIGHT);
     CeedQFunctionAddInput(qf_error, "dx", dim*dim, CEED_EVAL_GRAD);
     CeedQFunctionAddInput(qf_error, "u", dim, CEED_EVAL_INTERP);

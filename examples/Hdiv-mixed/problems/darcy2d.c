@@ -77,9 +77,17 @@ PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   CeedQFunctionContextCreate(ceed, &darcy_context);
   CeedQFunctionContextSetData(darcy_context, CEED_MEM_HOST, CEED_COPY_VALUES,
                               sizeof(*darcy_ctx), darcy_ctx);
-  CeedQFunctionContextSetDataDestroy(darcy_context, CEED_MEM_HOST,
-                                     FreeContextPetsc);
-  problem_data->qfunction_context = darcy_context;
+  //CeedQFunctionContextSetDataDestroy(darcy_context, CEED_MEM_HOST,
+  //                                   FreeContextPetsc);
+  problem_data->true_qfunction_ctx = darcy_context;
+  CeedQFunctionContextReferenceCopy(darcy_context,
+                                    &problem_data->residual_qfunction_ctx);
+  CeedQFunctionContextReferenceCopy(darcy_context,
+                                    &problem_data->jacobian_qfunction_ctx);
+  CeedQFunctionContextReferenceCopy(darcy_context,
+                                    &problem_data->error_qfunction_ctx);
+
+  PetscCall( PetscFree(darcy_ctx) );
 
   PetscFunctionReturn(0);
 }

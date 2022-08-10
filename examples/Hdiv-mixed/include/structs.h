@@ -63,7 +63,9 @@ struct ProblemData_ {
         *rhs_p0_loc;
   CeedQuadMode      quadrature_mode;
   CeedInt           elem_node, dim, q_data_size_face;
-  CeedQFunctionContext qfunction_context;
+  CeedQFunctionContext true_qfunction_ctx, error_qfunction_ctx,
+                       residual_qfunction_ctx, jacobian_qfunction_ctx,
+                       rhs_u0_qfunction_ctx ;
   PetscBool         has_ts;
 };
 

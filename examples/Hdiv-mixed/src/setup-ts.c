@@ -9,7 +9,7 @@
 
 
 // -----------------------------------------------------------------------------
-// Setup operator context data for Richard problem, u field
+// Setup operator context data for initial condition, u field
 // -----------------------------------------------------------------------------
 PetscErrorCode SetupResidualOperatorCtx_U0(MPI_Comm comm, DM dm_u0, Ceed ceed,
     CeedData ceed_data,
@@ -29,7 +29,7 @@ PetscErrorCode SetupResidualOperatorCtx_U0(MPI_Comm comm, DM dm_u0, Ceed ceed,
 }
 
 // -----------------------------------------------------------------------------
-// Setup operator context data for Richard problem, u field
+// Setup operator context data for initial condition, p field
 // -----------------------------------------------------------------------------
 PetscErrorCode SetupResidualOperatorCtx_P0(MPI_Comm comm, DM dm_p0, Ceed ceed,
     CeedData ceed_data,
@@ -49,13 +49,34 @@ PetscErrorCode SetupResidualOperatorCtx_P0(MPI_Comm comm, DM dm_p0, Ceed ceed,
 }
 
 // -----------------------------------------------------------------------------
+// Setup operator context data for Residual of Richard problem
+// -----------------------------------------------------------------------------
+PetscErrorCode SetupResidualOperatorCtx_Ut(MPI_Comm comm, DM dm, Ceed ceed,
+    CeedData ceed_data, OperatorApplyContext ctx_residual_ut) {
+  PetscFunctionBeginUser;
+
+  ctx_residual_ut->comm = comm;
+  ctx_residual_ut->dm = dm;
+  PetscCall( DMCreateLocalVector(dm, &ctx_residual_ut->X_loc) );
+  PetscCall( VecDuplicate(ctx_residual_ut->X_loc, &ctx_residual_ut->Y_loc) );
+  PetscCall( VecDuplicate(ctx_residual_ut->X_loc, &ctx_residual_ut->X_t_loc) );
+  ctx_residual_ut->x_ceed = ceed_data->x_ceed;
+  ctx_residual_ut->x_t_ceed = ceed_data->x_t_ceed;
+  ctx_residual_ut->y_ceed = ceed_data->y_ceed;
+  ctx_residual_ut->ceed = ceed;
+  ctx_residual_ut->op_apply = ceed_data->op_residual;
+
+  PetscFunctionReturn(0);
+}
+
+// -----------------------------------------------------------------------------
 // Create global initial conditions vector
 // -----------------------------------------------------------------------------
-PetscErrorCode CreateInitialConditions(DM dm, DM dm_u0, DM dm_p0,
-                                       CeedData ceed_data,
+PetscErrorCode CreateInitialConditions(CeedData ceed_data,
                                        Vec U, VecType vec_type,
                                        OperatorApplyContext ctx_initial_u0,
-                                       OperatorApplyContext ctx_initial_p0) {
+                                       OperatorApplyContext ctx_initial_p0,
+                                       OperatorApplyContext ctx_residual_ut) {
 
   PetscFunctionBeginUser;
   // ----------------------------------------------
@@ -64,7 +85,7 @@ PetscErrorCode CreateInitialConditions(DM dm, DM dm_u0, DM dm_p0,
   Vec rhs_u_loc;
   PetscScalar *ru;
   PetscMemType ru_mem_type;
-  PetscCall( DMCreateLocalVector(dm_u0, &rhs_u_loc) );
+  PetscCall( DMCreateLocalVector(ctx_initial_u0->dm, &rhs_u_loc) );
   PetscCall( VecZeroEntries(rhs_u_loc) );
   PetscCall( VecGetArrayAndMemType(rhs_u_loc, &ru, &ru_mem_type) );
   CeedElemRestrictionCreateVector(ceed_data->elem_restr_u0,
@@ -83,15 +104,15 @@ PetscErrorCode CreateInitialConditions(DM dm, DM dm_u0, DM dm_p0,
   Vec rhs_u0;
   CeedVectorTakeArray(ceed_data->rhs_u0_ceed, MemTypeP2C(ru_mem_type), NULL);
   PetscCall( VecRestoreArrayAndMemType(rhs_u_loc, &ru) );
-  PetscCall( DMCreateGlobalVector(dm_u0, &rhs_u0) );
+  PetscCall( DMCreateGlobalVector(ctx_initial_u0->dm, &rhs_u0) );
   PetscCall( VecZeroEntries(rhs_u0) );
-  PetscCall( DMLocalToGlobal(dm_u0, rhs_u_loc, ADD_VALUES, rhs_u0) );
+  PetscCall( DMLocalToGlobal(ctx_initial_u0->dm, rhs_u_loc, ADD_VALUES, rhs_u0) );
 
   // ----------------------------------------------
   // Solve for U0, M*U0 = rhs_u0
   // ----------------------------------------------
   Vec U0;
-  PetscCall( DMCreateGlobalVector(dm_u0, &U0) );
+  PetscCall( DMCreateGlobalVector(ctx_initial_u0->dm, &U0) );
   PetscCall( VecZeroEntries(U0) );
   PetscInt U0_g_size, U0_l_size;
   PetscCall( VecGetSize(U0, &U0_g_size) );
@@ -120,7 +141,7 @@ PetscErrorCode CreateInitialConditions(DM dm, DM dm_u0, DM dm_p0,
   Vec rhs_p_loc;
   PetscScalar *rp;
   PetscMemType rp_mem_type;
-  PetscCall( DMCreateLocalVector(dm_p0, &rhs_p_loc) );
+  PetscCall( DMCreateLocalVector(ctx_initial_p0->dm, &rhs_p_loc) );
   PetscCall( VecZeroEntries(rhs_p_loc) );
   PetscCall( VecGetArrayAndMemType(rhs_p_loc, &rp, &rp_mem_type) );
   CeedElemRestrictionCreateVector(ceed_data->elem_restr_p0,
@@ -139,15 +160,15 @@ PetscErrorCode CreateInitialConditions(DM dm, DM dm_u0, DM dm_p0,
   Vec rhs_p0;
   CeedVectorTakeArray(ceed_data->rhs_p0_ceed, MemTypeP2C(rp_mem_type), NULL);
   PetscCall( VecRestoreArrayAndMemType(rhs_p_loc, &rp) );
-  PetscCall( DMCreateGlobalVector(dm_p0, &rhs_p0) );
+  PetscCall( DMCreateGlobalVector(ctx_initial_p0->dm, &rhs_p0) );
   PetscCall( VecZeroEntries(rhs_p0) );
-  PetscCall( DMLocalToGlobal(dm_p0, rhs_p_loc, ADD_VALUES, rhs_p0) );
+  PetscCall( DMLocalToGlobal(ctx_initial_p0->dm, rhs_p_loc, ADD_VALUES, rhs_p0) );
 
   // ----------------------------------------------
   // Solve for P0, M*P0 = rhs_p0
   // ----------------------------------------------
   Vec P0;
-  PetscCall( DMCreateGlobalVector(dm_p0, &P0) );
+  PetscCall( DMCreateGlobalVector(ctx_initial_p0->dm, &P0) );
   PetscCall( VecZeroEntries(P0) );
   PetscInt P0_g_size, P0_l_size;
   PetscCall( VecGetSize(P0, &P0_g_size) );
@@ -173,32 +194,33 @@ PetscErrorCode CreateInitialConditions(DM dm, DM dm_u0, DM dm_p0,
   // ----------------------------------------------
   // Create final initial conditions U
   // ----------------------------------------------
-  Vec U_loc;
-  PetscScalar *u;
-  PetscCall( DMCreateLocalVector(dm, &U_loc) );
-  PetscInt U_l_size;
-  PetscCall( VecGetLocalSize(U, &U_l_size) );
-  // Global-to-local
+  // Global-to-local for U0, P0
   PetscCall( DMGlobalToLocal(ctx_initial_u0->dm, U0, INSERT_VALUES,
                              ctx_initial_u0->X_loc) );
   PetscCall( DMGlobalToLocal(ctx_initial_p0->dm, P0, INSERT_VALUES,
                              ctx_initial_p0->X_loc) );
-
+  // Get array u0,p0
   const PetscScalar *u0, *p0;
   PetscCall( VecGetArrayRead(ctx_initial_u0->X_loc, &u0) );
   PetscCall( VecGetArrayRead(ctx_initial_p0->X_loc, &p0) );
-  PetscCall( VecGetArray(U_loc, &u) );
+
+  // Get array of local vector U = [p,u]
+  PetscScalar *u;
+  PetscInt U_l_size;
+  PetscCall( VecGetLocalSize(U, &U_l_size) );
+  PetscCall( VecZeroEntries(ctx_residual_ut->X_loc) );
+  PetscCall( VecGetArray(ctx_residual_ut->X_loc, &u) );
   for (PetscInt i = 0; i<ceed_data->num_elem; i++) {
     u[i] = p0[i];
   }
   for (PetscInt i = ceed_data->num_elem; i<U_l_size; i++) {
     u[i] = u0[i-ceed_data->num_elem];
   }
-  PetscCall( VecRestoreArray(U_loc, &u) );
+  PetscCall( VecRestoreArray(ctx_residual_ut->X_loc, &u) );
   PetscCall( VecRestoreArrayRead(ctx_initial_p0->X_loc, &p0) );
   PetscCall( VecRestoreArrayRead(ctx_initial_u0->X_loc, &u0) );
-  PetscCall( DMLocalToGlobal(dm, U_loc, ADD_VALUES,
-                             U) );
+  PetscCall( DMLocalToGlobal(ctx_residual_ut->dm, ctx_residual_ut->X_loc,
+                             ADD_VALUES, U) );
 
   // Clean up
   PetscCall( VecDestroy(&rhs_u_loc) );
@@ -217,25 +239,6 @@ PetscErrorCode CreateInitialConditions(DM dm, DM dm_u0, DM dm_p0,
   PetscCall( KSPDestroy(&ksp_u0) );
   PetscFunctionReturn(0);
 
-}
-// -----------------------------------------------------------------------------
-// Setup operator context data for Richard problem
-// -----------------------------------------------------------------------------
-PetscErrorCode SetupResidualOperatorCtx_Ut(DM dm, Ceed ceed, CeedData ceed_data,
-    OperatorApplyContext ctx_residual_ut) {
-  PetscFunctionBeginUser;
-
-  ctx_residual_ut->dm = dm;
-  PetscCall( DMCreateLocalVector(dm, &ctx_residual_ut->X_loc) );
-  PetscCall( VecDuplicate(ctx_residual_ut->X_loc, &ctx_residual_ut->Y_loc) );
-  PetscCall( VecDuplicate(ctx_residual_ut->X_loc, &ctx_residual_ut->X_t_loc) );
-  ctx_residual_ut->x_ceed = ceed_data->x_ceed;
-  ctx_residual_ut->x_t_ceed = ceed_data->x_t_ceed;
-  ctx_residual_ut->y_ceed = ceed_data->y_ceed;
-  ctx_residual_ut->ceed = ceed;
-  ctx_residual_ut->op_apply = ceed_data->op_residual;
-
-  PetscFunctionReturn(0);
 }
 
 PetscErrorCode TSFormIResidual(TS ts, PetscReal time, Vec X, Vec X_t, Vec Y,
