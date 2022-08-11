@@ -66,7 +66,7 @@ struct RICHARDContext_ {
   CeedScalar rho_a0;
   CeedScalar alpha_a, b_a;
   CeedScalar beta, p0;
-  CeedScalar t, t_final;
+  CeedScalar t, t_final, dt;
   CeedScalar gamma;
 };
 #endif
@@ -105,8 +105,9 @@ CEED_QFUNCTION(RichardRhsU02D)(void *ctx, const CeedInt Q,
     CeedScalar k_r = b_a + alpha_a*(1-x*y);
     // rho = rho_a/rho_a0
     CeedScalar rho = 1.;
-    // ue = -rho*k_r*K *[grad(\psi) - rho*g_u]
-    CeedScalar ue[2] = {-rho*k_r*kappa*psi1_x, -rho*k_r*kappa*(psi1_y-1)};
+    // ue = -rho*k_r*K *[grad(\psi)]
+    CeedScalar ue[2] = {-rho*k_r*kappa*psi1_x,
+                        -rho*k_r*kappa*psi1_y};
     CeedScalar rhs1[2];
     // rhs = (v, ue) = J^T*ue*w
     AlphaMatTransposeVecMult2x2(w[i], J, ue, rhs1);
@@ -184,10 +185,10 @@ CEED_QFUNCTION(RichardRhsP02D)(void *ctx, const CeedInt Q,
                                 {dxdX[0][1][i], dxdX[1][1][i]}};
     const CeedScalar det_J = MatDet2x2(J);
     // psi = exp(-gamma*t)*sin(pi*x)*sin(pi*y)
-    CeedScalar psi_e = sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
+    CeedScalar psi1 = sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
 
     // rhs = (q, pe) = pe*w*det_J
-    rhs_p0[i] = psi_e*w[i]*det_J;
+    rhs_p0[i] = psi1*w[i]*det_J;
   } // End of Quadrature Point Loop
   return 0;
 }

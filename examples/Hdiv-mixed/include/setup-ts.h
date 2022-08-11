@@ -20,6 +20,6 @@ PetscErrorCode SetupResidualOperatorCtx_P0(MPI_Comm comm, DM dm, Ceed ceed,
 PetscErrorCode TSFormIResidual(TS ts, PetscReal time, Vec X, Vec X_t, Vec Y,
                                void *ctx_residual_ut);
 PetscErrorCode TSSolveRichard(DM dm, CeedData ceed_data, AppCtx app_ctx,
-                              Vec *U, PetscScalar *f_time, TS *ts);
+                              Vec *U, TS *ts);
 
 #endif // setup_ts_h

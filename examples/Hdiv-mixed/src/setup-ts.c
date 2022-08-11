@@ -250,8 +250,18 @@ PetscErrorCode TSFormIResidual(TS ts, PetscReal time, Vec X, Vec X_t, Vec Y,
   PetscFunctionBeginUser;
 
   // Update time dependent data
-
-
+  if(ctx->t != time) {
+    CeedOperatorContextSetDouble(ctx->op_apply,
+                                 ctx->solution_time_label, &time);
+    ctx->t = time;
+  }
+  //PetscScalar dt;
+  //PetscCall( TSGetTimeStep(ts, &dt) );
+  //if (ctx->dt != dt) {
+  //  CeedOperatorContextSetDouble(ctx->op_apply,
+  //                               ctx->timestep_label, &dt);
+  //  ctx->dt = dt;
+  //}
   // Global-to-local
   PetscCall( DMGlobalToLocal(ctx->dm, X, INSERT_VALUES, ctx->X_loc) );
   PetscCall( DMGlobalToLocal(ctx->dm, X_t, INSERT_VALUES, ctx->X_t_loc) );
@@ -282,31 +292,30 @@ PetscErrorCode TSFormIResidual(TS ts, PetscReal time, Vec X, Vec X_t, Vec Y,
   PetscCall( VecZeroEntries(Y) );
   PetscCall( DMLocalToGlobal(ctx->dm, ctx->Y_loc, ADD_VALUES, Y) );
 
-  // Restore vectors
-  PetscCall( DMRestoreLocalVector(ctx->dm, &ctx->Y_loc) );
-
   PetscFunctionReturn(0);
 }
 
 // TS: Create, setup, and solve
 PetscErrorCode TSSolveRichard(DM dm, CeedData ceed_data, AppCtx app_ctx,
-                              Vec *U, PetscScalar *f_time, TS *ts) {
+                              Vec *U, TS *ts) {
   MPI_Comm       comm = app_ctx->comm;
   TSAdapt        adapt;
   PetscFunctionBeginUser;
 
   PetscCall( TSCreate(comm, ts) );
   PetscCall( TSSetDM(*ts, dm) );
+  PetscCall( TSSetType(*ts, TSBDF) );
   PetscCall( TSSetIFunction(*ts, NULL, TSFormIResidual,
                             ceed_data->ctx_residual_ut) );
 
-  PetscCall( TSSetMaxTime(*ts, 10) );
+  PetscCall( TSSetMaxTime(*ts, app_ctx->t_final) );
   PetscCall( TSSetExactFinalTime(*ts, TS_EXACTFINALTIME_STEPOVER) );
   PetscCall( TSSetTimeStep(*ts, 1.e-2) );
   PetscCall( TSGetAdapt(*ts, &adapt) );
   PetscCall( TSAdaptSetStepLimits(adapt, 1.e-12, 1.e2) );
   PetscCall( TSSetFromOptions(*ts) );
-
+  ceed_data->ctx_residual_ut->t = -1.0;
+  //ceed_data->ctx_residual_ut->dt = -1.0;
   // Solve
   PetscScalar start_time;
   PetscCall( TSGetTime(*ts, &start_time) );
@@ -319,7 +328,7 @@ PetscErrorCode TSSolveRichard(DM dm, CeedData ceed_data, AppCtx app_ctx,
 
   PetscScalar    final_time;
   PetscCall( TSGetSolveTime(*ts, &final_time) );
-  *f_time = final_time;
+  app_ctx->t_final = final_time;
 
   PetscFunctionReturn(0);
 }

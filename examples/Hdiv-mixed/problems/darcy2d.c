@@ -54,7 +54,7 @@ PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   // ------------------------------------------------------
   //              Command line Options
   // ------------------------------------------------------
-  CeedScalar kappa = 1., rho_a0 = 998.2, g = 9.8, alpha_a = 1., b_a = 10.;
+  CeedScalar kappa = 10., rho_a0 = 998.2, g = 9.8, alpha_a = 1., b_a = 10.;
   PetscOptionsBegin(app_ctx->comm, NULL, "Options for Hdiv-mixed problem", NULL);
   PetscCall( PetscOptionsScalar("-kappa", "Hydraulic Conductivity", NULL,
                                 kappa, &kappa, NULL));

@@ -136,10 +136,10 @@ int main(int argc, char **argv) {
   //PetscCall( DMAddBoundariesPressure(ceed, ceed_data, app_ctx, problem_data, dm,
   //                                   bc_pressure) );
 
-
   // ---------------------------------------------------------------------------
   // Setup TSSolve for Richard problem
   // ---------------------------------------------------------------------------
+  TS ts;
   if (problem_data->has_ts) {
     // ---------------------------------------------------------------------------
     // Create global initial conditions
@@ -154,46 +154,49 @@ int main(int argc, char **argv) {
                             ceed_data->ctx_initial_u0,
                             ceed_data->ctx_initial_p0,
                             ceed_data->ctx_residual_ut);
-    VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+    //VecView(U, PETSC_VIEWER_STDOUT_WORLD);
+    // Solve Richards problem
+    PetscCall( VecZeroEntries(ceed_data->ctx_residual_ut->X_loc) );
+    PetscCall( VecZeroEntries(ceed_data->ctx_residual_ut->X_t_loc) );
+    PetscCall( TSSolveRichard(dm, ceed_data, app_ctx,
+                              &U, &ts) );
+    //VecView(U, PETSC_VIEWER_STDOUT_WORLD);
   }
 
+  SNES snes;
+  KSP ksp;
   if (!problem_data->has_ts) {
     // ---------------------------------------------------------------------------
-    // Solve PDE
+    // Setup SNES for Darcy problem
     // ---------------------------------------------------------------------------
     // Create SNES
-    SNES snes;
-    KSP ksp;
     PetscCall( SNESCreate(comm, &snes) );
     PetscCall( SNESGetKSP(snes, &ksp) );
     PetscCall( PDESolver(comm, dm, ceed, ceed_data, vec_type, snes, ksp, &U) );
     //VecView(U, PETSC_VIEWER_STDOUT_WORLD);
-
-    // ---------------------------------------------------------------------------
-    // Compute L2 error of mms problem
-    // ---------------------------------------------------------------------------
-    CeedScalar l2_error_u, l2_error_p;
-    PetscCall( ComputeL2Error(dm, ceed,ceed_data, U, &l2_error_u,
-                              &l2_error_p) );
-
-    // ---------------------------------------------------------------------------
-    // Print output results
-    // ---------------------------------------------------------------------------
-    PetscCall( PrintOutput(ceed, mem_type_backend,
-                           snes, ksp, U, l2_error_u, l2_error_p, app_ctx) );
-
-    // ---------------------------------------------------------------------------
-    // Save solution (paraview)
-    // ---------------------------------------------------------------------------
-    PetscViewer viewer;
-
-    PetscCall( PetscViewerVTKOpen(comm,"solution.vtu",FILE_MODE_WRITE,&viewer) );
-    PetscCall( VecView(U, viewer) );
-    PetscCall( PetscViewerDestroy(&viewer) );
-
-    PetscCall( SNESDestroy(&snes) );
-
   }
+
+  // ---------------------------------------------------------------------------
+  // Compute L2 error of mms problem
+  // ---------------------------------------------------------------------------
+  CeedScalar l2_error_u, l2_error_p;
+  PetscCall( ComputeL2Error(dm, ceed, ceed_data, U, &l2_error_u,
+                            &l2_error_p) );
+
+  // ---------------------------------------------------------------------------
+  // Print output results
+  // ---------------------------------------------------------------------------
+  PetscCall( PrintOutput(ceed, app_ctx, problem_data->has_ts, mem_type_backend,
+                         ts, snes, ksp, U, l2_error_u, l2_error_p) );
+
+  // ---------------------------------------------------------------------------
+  // Save solution (paraview)
+  // ---------------------------------------------------------------------------
+  PetscViewer viewer;
+  PetscCall( PetscViewerVTKOpen(comm,"solution.vtu",FILE_MODE_WRITE,&viewer) );
+  PetscCall( VecView(U, viewer) );
+  PetscCall( PetscViewerDestroy(&viewer) );
+
   // ---------------------------------------------------------------------------
   // Free objects
   // ---------------------------------------------------------------------------
@@ -203,6 +206,11 @@ int main(int argc, char **argv) {
   PetscCall( DMDestroy(&dm_u0) );
   PetscCall( DMDestroy(&dm_p0) );
   PetscCall( VecDestroy(&U) );
+  if (problem_data->has_ts) {
+    PetscCall( TSDestroy(&ts) );
+  } else {
+    PetscCall( SNESDestroy(&snes) );
+  }
   PetscCall( CeedDataDestroy(ceed_data, problem_data) );
 
   // -- Function list

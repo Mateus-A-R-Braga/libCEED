@@ -18,8 +18,7 @@ struct AppCtx_ {
   // Problem type arguments
   PetscFunctionList problems;
   char              problem_name[PETSC_MAX_PATH_LEN];
-  CeedContextFieldLabel    solution_time_label;
-  CeedScalar        t_final;
+  CeedScalar        t_final, t;
 };
 
 // PETSc operator contexts
@@ -31,8 +30,9 @@ struct OperatorApplyContext_ {
   CeedOperator    op_apply;
   DM              dm;
   Ceed            ceed;
-  CeedScalar      t;
-  CeedContextFieldLabel    solution_time_label, final_time_label;
+  CeedScalar      t, dt;
+  CeedContextFieldLabel solution_time_label, final_time_label,
+                        timestep_label;   ;
 };
 
 // libCEED data struct

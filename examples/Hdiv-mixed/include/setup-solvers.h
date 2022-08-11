@@ -19,10 +19,10 @@ PetscErrorCode PDESolver(MPI_Comm comm, DM dm, Ceed ceed, CeedData ceed_data,
                          VecType vec_type, SNES snes, KSP ksp, Vec *U);
 PetscErrorCode ComputeL2Error(DM dm, Ceed ceed, CeedData ceed_data, Vec U,
                               CeedScalar *l2_error_u, CeedScalar *l2_error_p);
-PetscErrorCode PrintOutput(Ceed ceed,
+PetscErrorCode PrintOutput(Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
                            CeedMemType mem_type_backend,
-                           SNES snes, KSP ksp,
+                           TS ts, SNES snes, KSP ksp,
                            Vec U, CeedScalar l2_error_u,
-                           CeedScalar l2_error_p, AppCtx app_ctx);
+                           CeedScalar l2_error_p);
 
 #endif // setup_solvers_h

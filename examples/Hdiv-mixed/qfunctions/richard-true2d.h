@@ -65,7 +65,7 @@ struct RICHARDContext_ {
   CeedScalar rho_a0;
   CeedScalar alpha_a, b_a;
   CeedScalar beta, p0;
-  CeedScalar t, t_final;
+  CeedScalar t, t_final, dt;
   CeedScalar gamma;
 };
 #endif
@@ -94,30 +94,32 @@ CEED_QFUNCTION(RichardTrue2D)(void *ctx, const CeedInt Q,
   for (CeedInt i=0; i<Q; i++) {
     CeedScalar x = coords[i+0*Q], y = coords[i+1*Q];
     // psi = exp(-gamma*t)*sin(pi*x)*sin(pi*y)
-    CeedScalar psi1 = sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    CeedScalar psi    = exp(-gamma*t_final)*psi1;
-    CeedScalar psi1_x = PI_DOUBLE*cos(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    CeedScalar psi_x  = exp(-gamma*t_final)*psi1_x;
-    CeedScalar psi1_y = PI_DOUBLE*sin(PI_DOUBLE*x)*cos(PI_DOUBLE*y);
-    CeedScalar psi_y  = exp(-gamma*t_final)*psi1_y;
-
+    // We factor exp() term
+    CeedScalar psi    = sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
+    CeedScalar psi_x  = PI_DOUBLE*cos(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
+    CeedScalar psi_xx  = -PI_DOUBLE*PI_DOUBLE*psi;
+    CeedScalar psi_y  = PI_DOUBLE*sin(PI_DOUBLE*x)*cos(PI_DOUBLE*y);
+    CeedScalar psi_yy  = -PI_DOUBLE*PI_DOUBLE*psi;
     // k_r = b_a + alpha_a * (1 - x*y)
     CeedScalar k_r = b_a + alpha_a*(1-x*y);
+    CeedScalar k_rx = -alpha_a*y;
+    CeedScalar k_ry = -alpha_a*x;
     // rho = rho_a/rho_a0
     CeedScalar rho = 1.;
-    // u = -rho*k_r*K *[grad(\psi) - rho*g_u]
-    CeedScalar u[2] = {-rho*k_r*kappa*psi_x, -rho*k_r*kappa*(psi_y-1)};
-    // we factor out exp() term and applied in residual function richard-system2d.h
-    CeedScalar div_u1 = -rho*kappa*(-alpha_a*y*psi1_x - k_r*PI_DOUBLE*PI_DOUBLE*psi1
-                                   -alpha_a*x*psi1_y - k_r*PI_DOUBLE*PI_DOUBLE*psi1);
-
+    // u = -rho*k_r*K *[grad(\psi)]
+    CeedScalar u[2] = {-rho*kappa*exp(-gamma*t_final)*k_r*psi_x, 
+                       -rho*kappa*exp(-gamma*t_final)*k_r*psi_y};
+    //CeedScalar div_u = -rho*kappa*exp(-gamma*t_final)*(k_rx*psi_x + k_r*psi_xx +
+    //                                                     k_ry*psi_y + k_r*psi_yy);
+    CeedScalar div_u = -rho*kappa*(k_rx*psi_x + k_r*psi_xx +
+                                   k_ry*psi_y + k_r*psi_yy);
     // True Force: f = \div(u) + d (rho*theta)/dt
     // since the force is a function of time, and this qfunction get called once
     // and the t variable doesn't get updated, we factored exp() term and update it
     // in residual, thats why we have psi = exp() * psi1, ...
-    true_force[i+0*Q] = div_u1 -alpha_a*gamma*psi1;
+    true_force[i+0*Q] = div_u -alpha_a*gamma*psi;
     // True Solution
-    true_solution[i+0*Q] = psi;
+    true_solution[i+0*Q] = exp(-gamma*t_final)*psi;
     true_solution[i+1*Q] = u[0];
     true_solution[i+2*Q] = u[1];
   } // End of Quadrature Point Loop
