@@ -32,7 +32,7 @@ declare -A run_flags
     run_flags[pc_type]=svd
     if [[ $dim -eq 2 ]];
     then
-        run_flags[problem]=richard2d
+        run_flags[problem]=darcy2d
         run_flags[dm_plex_dim]=$dim
         run_flags[dm_plex_box_faces]=2,2
     else

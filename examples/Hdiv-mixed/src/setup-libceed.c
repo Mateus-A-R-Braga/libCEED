@@ -66,6 +66,19 @@ PetscErrorCode CeedDataDestroy(CeedData ceed_data, ProblemData problem_data) {
     //Operators
     CeedOperatorDestroy(&ceed_data->op_jacobian);
   }
+
+  // data for post-processing
+  if(problem_data->view_solution) {
+    CeedVectorDestroy(&ceed_data->up_ceed);
+    CeedVectorDestroy(&ceed_data->vp_ceed);
+    CeedVectorDestroy(&ceed_data->u_ceed);
+    CeedVectorDestroy(&ceed_data->post_rhs_ceed);
+    CeedElemRestrictionDestroy(&ceed_data->elem_restr_u_post);
+    CeedQFunctionDestroy(&ceed_data->qf_post_rhs);
+    CeedOperatorDestroy(&ceed_data->op_post_rhs);
+    CeedQFunctionDestroy(&ceed_data->qf_post_mass);
+    CeedOperatorDestroy(&ceed_data->op_post_mass);
+  }
   PetscCall( PetscFree(ceed_data) );
 
   PetscFunctionReturn(0);
@@ -235,8 +248,8 @@ PetscErrorCode CreateRestrictionFromPlexOriented(Ceed ceed, DM dm, DM dm_u0,
 // -----------------------------------------------------------------------------
 // Set up libCEED on the fine grid for a given degree
 // -----------------------------------------------------------------------------
-PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
-                            AppCtx app_ctx,
+PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, DM dm_H1,
+                            Ceed ceed, AppCtx app_ctx,
                             ProblemData problem_data,
                             CeedData ceed_data) {
   CeedInt       P = app_ctx->degree + 1;
@@ -646,6 +659,72 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, Ceed ceed,
   ceed_data->qf_error = qf_error;
   ceed_data->op_error = op_error;
 
+  if (app_ctx->view_solution) {
+    // -- Post processing
+    PetscCall( CreateRestrictionFromPlex(ceed, dm_H1, height, domain_label,
+                                         value, &ceed_data->elem_restr_u_post) );
+    // ---------------------------------------------------------------------------
+    // Setup RHS for post processing
+    // ---------------------------------------------------------------------------
+    // -- Operator action variables: we use them in post-processing.c
+    CeedElemRestrictionCreateVector(ceed_data->elem_restr_u, &ceed_data->u_ceed,
+                                    NULL);
+    CeedQFunction qf_post_rhs;
+    CeedOperator  op_post_rhs;
+    // Create the q-function that sets up the RHS
+    CeedQFunctionCreateInterior(ceed, 1, problem_data->post_rhs,
+                                problem_data->post_rhs_loc, &qf_post_rhs);
+    CeedQFunctionAddInput(qf_post_rhs, "weight", 1, CEED_EVAL_WEIGHT);
+    CeedQFunctionAddInput(qf_post_rhs, "dx", dim*dim, CEED_EVAL_GRAD);
+    CeedQFunctionAddInput(qf_post_rhs, "u_post", dim, CEED_EVAL_INTERP);
+    CeedQFunctionAddOutput(qf_post_rhs, "rhs_post", dim, CEED_EVAL_INTERP);
+    // Create the operator that builds the RHS
+    CeedOperatorCreate(ceed, qf_post_rhs, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
+                       &op_post_rhs);
+    CeedOperatorSetField(op_post_rhs, "weight", CEED_ELEMRESTRICTION_NONE,
+                         ceed_data->basis_x, CEED_VECTOR_NONE);
+    CeedOperatorSetField(op_post_rhs, "dx", ceed_data->elem_restr_x,
+                         ceed_data->basis_x, ceed_data->x_coord);
+    CeedOperatorSetField(op_post_rhs, "u_post", ceed_data->elem_restr_u,
+                         ceed_data->basis_u, ceed_data->u_ceed);
+    CeedOperatorSetField(op_post_rhs, "rhs_post", ceed_data->elem_restr_u_post,
+                         ceed_data->basis_x, CEED_VECTOR_ACTIVE);
+    // -- Save libCEED data to apply operator in post-processing.c
+    ceed_data->qf_post_rhs = qf_post_rhs;
+    ceed_data->op_post_rhs = op_post_rhs;
+    // ---------------------------------------------------------------------------
+    // Setup qfunction for initial conditions u0
+    // ---------------------------------------------------------------------------
+    CeedQFunction qf_post_mass;
+    CeedOperator  op_post_mass;
+    CeedQFunctionCreateInterior(ceed, 1, problem_data->post_mass,
+                                problem_data->post_mass_loc, &qf_post_mass);
+    CeedQFunctionAddInput(qf_post_mass, "weight", 1, CEED_EVAL_WEIGHT);
+    CeedQFunctionAddInput(qf_post_mass, "dx", dim*dim, CEED_EVAL_GRAD);
+    CeedQFunctionAddInput(qf_post_mass, "u", dim, CEED_EVAL_INTERP);
+    CeedQFunctionAddOutput(qf_post_mass, "v", dim, CEED_EVAL_INTERP);
+    // Create the operator that builds the initial conditions
+    CeedOperatorCreate(ceed, qf_post_mass, CEED_QFUNCTION_NONE, CEED_QFUNCTION_NONE,
+                       &op_post_mass);
+    CeedOperatorSetField(op_post_mass, "weight", CEED_ELEMRESTRICTION_NONE,
+                         ceed_data->basis_x, CEED_VECTOR_NONE);
+    CeedOperatorSetField(op_post_mass, "dx", ceed_data->elem_restr_x,
+                         ceed_data->basis_x, ceed_data->x_coord);
+    CeedOperatorSetField(op_post_mass, "u", ceed_data->elem_restr_u_post,
+                         ceed_data->basis_x, CEED_VECTOR_ACTIVE);
+    CeedOperatorSetField(op_post_mass, "v", ceed_data->elem_restr_u_post,
+                         ceed_data->basis_x, CEED_VECTOR_ACTIVE);
+    // -- Save libCEED data to apply operator in post-processing.c
+    ceed_data->qf_post_mass = qf_post_mass;
+    ceed_data->op_post_mass = op_post_mass;
+    // -- Operator action variables: we use them in post-processing.c
+    CeedElemRestrictionCreateVector(ceed_data->elem_restr_u_post,
+                                    &ceed_data->up_ceed,
+                                    NULL);
+    CeedElemRestrictionCreateVector(ceed_data->elem_restr_u_post,
+                                    &ceed_data->vp_ceed,
+                                    NULL);
+  }
   // -- Cleanup
   CeedVectorDestroy(&true_vec);
   CeedVectorDestroy(&true_force);

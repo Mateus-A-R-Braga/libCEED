@@ -44,6 +44,17 @@ PetscErrorCode ProcessCommandLineOptions(AppCtx app_ctx) {
   app_ctx->q_extra = 0;
   PetscCall( PetscOptionsInt("-q_extra", "Number of extra quadrature points",
                              NULL, app_ctx->q_extra, &app_ctx->q_extra, NULL) );
+  app_ctx->view_solution = PETSC_FALSE;
+  PetscCall( PetscOptionsBool("-view_solution",
+                              "View solution in Paraview",
+                              NULL, app_ctx->view_solution,
+                              &(app_ctx->view_solution), NULL) );
+  app_ctx->quartic = PETSC_FALSE;
+  PetscCall( PetscOptionsBool("-quartic",
+                              "To test PetscViewer",
+                              NULL, app_ctx->quartic,
+                              &(app_ctx->quartic), NULL) );
+
   app_ctx->bc_pressure_count = 16;
   // we can set one face by: -bc_faces 1 OR multiple faces by :-bc_faces 1,2,3
   PetscCall( PetscOptionsIntArray("-bc_faces",

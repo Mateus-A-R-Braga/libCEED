@@ -21,6 +21,9 @@
 #include "../qfunctions/darcy-true2d.h"
 #include "../qfunctions/darcy-system2d.h"
 #include "../qfunctions/darcy-error2d.h"
+#include "../qfunctions/post-processing2d.h"
+#include "../qfunctions/darcy-true-quartic2d.h"
+#include "../qfunctions/darcy-system-quartic2d.h"
 //#include "../qfunctions/pressure-boundary2d.h"
 
 PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
@@ -49,7 +52,22 @@ PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
   problem_data->error_loc               = DarcyError2D_loc;
   //problem_data->bc_pressure             = BCPressure2D;
   //problem_data->bc_pressure_loc         = BCPressure2D_loc;
+  problem_data->post_rhs                = PostProcessingRhs2D;
+  problem_data->post_rhs_loc            = PostProcessingRhs2D_loc;
+  problem_data->post_mass               = PostProcessingMass2D;
+  problem_data->post_mass_loc           = PostProcessingMass2D_loc;
   problem_data->has_ts                  = PETSC_FALSE;
+  problem_data->view_solution           = app_ctx->view_solution;
+  problem_data->quartic                 = app_ctx->quartic;
+
+  if (app_ctx->quartic) {
+    problem_data->true_solution           = DarcyTrueQuartic2D;
+    problem_data->true_solution_loc       = DarcyTrueQuartic2D_loc;
+    problem_data->residual                = DarcySystemQuartic2D;
+    problem_data->residual_loc            = DarcySystemQuartic2D_loc;
+    problem_data->jacobian                = JacobianDarcySystemQuartic2D;
+    problem_data->jacobian_loc            = JacobianDarcySystemQuartic2D_loc;
+  }
 
   // ------------------------------------------------------
   //              Command line Options

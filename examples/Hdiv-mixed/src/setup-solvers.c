@@ -107,19 +107,18 @@ PetscErrorCode SNESFormJacobian(SNES snes, Vec U, Mat J, Mat J_pre,
 // Setup Solver
 // ---------------------------------------------------------------------------
 PetscErrorCode PDESolver(MPI_Comm comm, DM dm, Ceed ceed, CeedData ceed_data,
-                         VecType vec_type, SNES snes, KSP ksp, Vec *U_g) {
+                         VecType vec_type, SNES snes, KSP ksp, Vec *U) {
 
   PetscInt       U_l_size, U_g_size;
 
   PetscFunctionBeginUser;
 
-  // Create global unknown solution U_g
-  PetscCall( DMCreateGlobalVector(dm, U_g) );
-  PetscCall( VecGetSize(*U_g, &U_g_size) );
+  // Create global unknown solution U
+  PetscCall( VecGetSize(*U, &U_g_size) );
   // Local size for matShell
-  PetscCall( VecGetLocalSize(*U_g, &U_l_size) );
+  PetscCall( VecGetLocalSize(*U, &U_l_size) );
   Vec R;
-  PetscCall( VecDuplicate(*U_g, &R) );
+  PetscCall( VecDuplicate(*U, &R) );
 
   // ---------------------------------------------------------------------------
   // Setup SNES
@@ -156,8 +155,8 @@ PetscErrorCode PDESolver(MPI_Comm comm, DM dm, Ceed ceed, CeedData ceed_data,
   PetscCall( SNESSetFromOptions(snes) );
 
   // Solve
-  PetscCall( VecSet(*U_g, 0.0));
-  PetscCall( SNESSolve(snes, NULL, *U_g));
+  PetscCall( VecSet(*U, 0.0));
+  PetscCall( SNESSolve(snes, NULL, *U));
 
   // Free PETSc objects
   PetscCall( MatDestroy(&mat_jacobian) );
@@ -261,117 +260,4 @@ PetscErrorCode ComputeL2Error(DM dm, Ceed ceed, CeedData ceed_data, Vec U,
   PetscFunctionReturn(0);
 };
 
-// -----------------------------------------------------------------------------
-// This function print the output
-// -----------------------------------------------------------------------------
-PetscErrorCode PrintOutput(Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
-                           CeedMemType mem_type_backend,
-                           TS ts, SNES snes, KSP ksp,
-                           Vec U, CeedScalar l2_error_u, CeedScalar l2_error_p) {
-
-  PetscFunctionBeginUser;
-
-  const char *used_resource;
-  CeedGetResource(ceed, &used_resource);
-  char hostname[PETSC_MAX_PATH_LEN];
-  PetscCall( PetscGetHostName(hostname, sizeof hostname) );
-  PetscInt comm_size;
-  PetscCall( MPI_Comm_size(app_ctx->comm, &comm_size) );
-  PetscCall( PetscPrintf(app_ctx->comm,
-                         "\n-- Mixed H(div) Example - libCEED + PETSc --\n"
-                         "  MPI:\n"
-                         "    Hostname                           : %s\n"
-                         "    Total ranks                        : %d\n"
-                         "  libCEED:\n"
-                         "    libCEED Backend                    : %s\n"
-                         "    libCEED Backend MemType            : %s\n",
-                         hostname, comm_size, used_resource, CeedMemTypes[mem_type_backend]) );
-
-  VecType vecType;
-  PetscCall( VecGetType(U, &vecType) );
-  PetscCall( PetscPrintf(app_ctx->comm,
-                         "  PETSc:\n"
-                         "    PETSc Vec Type                     : %s\n",
-                         vecType) );
-
-  PetscInt       U_l_size, U_g_size;
-  PetscCall( VecGetSize(U, &U_g_size) );
-  PetscCall( VecGetLocalSize(U, &U_l_size) );
-  PetscCall( PetscPrintf(app_ctx->comm,
-                         "  Problem:\n"
-                         "    Problem Name                       : %s\n"
-                         "    Global nodes (u + p)               : %" PetscInt_FMT "\n"
-                         "    Owned nodes (u + p)                : %" PetscInt_FMT "\n",
-                         app_ctx->problem_name, U_g_size, U_l_size
-                        ) );
-  // --TS
-  if (has_ts) {
-    PetscInt ts_steps;
-    TSType ts_type;
-    TSConvergedReason ts_reason;
-    PetscCall( TSGetStepNumber(ts, &ts_steps) );
-    PetscCall( TSGetType(ts, &ts_type) );
-    PetscCall( TSGetConvergedReason(ts, &ts_reason) );
-    PetscCall( PetscPrintf(app_ctx->comm,
-                           "  TS:\n"
-                           "    TS Type                            : %s\n"
-                           "    TS Convergence                     : %s\n"
-                           "    Number of TS steps                 : %" PetscInt_FMT "\n"
-                           "    Final time                         : %g\n",
-                           ts_type, TSConvergedReasons[ts_reason],
-                           ts_steps, (double)app_ctx->t_final) );
-
-    PetscCall( TSGetSNES(ts, &snes) );
-  }
-  // -- SNES
-  PetscInt its, snes_its = 0;
-  PetscCall( SNESGetIterationNumber(snes, &its) );
-  snes_its += its;
-  SNESType snes_type;
-  SNESConvergedReason snes_reason;
-  PetscReal snes_rnorm;
-  PetscCall( SNESGetType(snes, &snes_type) );
-  PetscCall( SNESGetConvergedReason(snes, &snes_reason) );
-  PetscCall( SNESGetFunctionNorm(snes, &snes_rnorm) );
-  PetscCall( PetscPrintf(app_ctx->comm,
-                         "  SNES:\n"
-                         "    SNES Type                          : %s\n"
-                         "    SNES Convergence                   : %s\n"
-                         "    Total SNES Iterations              : %" PetscInt_FMT "\n"
-                         "    Final rnorm                        : %e\n",
-                         snes_type, SNESConvergedReasons[snes_reason],
-                         snes_its, (double)snes_rnorm) );
-  if (!has_ts) {
-    PetscInt ksp_its = 0;
-    PetscCall( SNESGetLinearSolveIterations(snes, &its) );
-    ksp_its += its;
-    KSPType ksp_type;
-    KSPConvergedReason ksp_reason;
-    PetscReal ksp_rnorm;
-    PC pc;
-    PCType pc_type;
-    PetscCall( KSPGetPC(ksp, &pc) );
-    PetscCall( PCGetType(pc, &pc_type) );
-    PetscCall( KSPGetType(ksp, &ksp_type) );
-    PetscCall( KSPGetConvergedReason(ksp, &ksp_reason) );
-    PetscCall( KSPGetIterationNumber(ksp, &ksp_its) );
-    PetscCall( KSPGetResidualNorm(ksp, &ksp_rnorm) );
-    PetscCall( PetscPrintf(app_ctx->comm,
-                           "  KSP:\n"
-                           "    KSP Type                           : %s\n"
-                           "    PC Type                            : %s\n"
-                           "    KSP Convergence                    : %s\n"
-                           "    Total KSP Iterations               : %" PetscInt_FMT "\n"
-                           "    Final rnorm                        : %e\n",
-                           ksp_type, pc_type, KSPConvergedReasons[ksp_reason], ksp_its,
-                           (double)ksp_rnorm ) );
-  }
-
-  PetscCall( PetscPrintf(app_ctx->comm,
-                         "  L2 Error (MMS):\n"
-                         "    L2 error of u and p                : %e, %e\n",
-                         (double)l2_error_u,
-                         (double)l2_error_p) );
-  PetscFunctionReturn(0);
-};
 // -----------------------------------------------------------------------------

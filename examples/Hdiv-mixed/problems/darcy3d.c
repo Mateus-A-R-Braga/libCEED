@@ -50,7 +50,7 @@ PetscErrorCode Hdiv_DARCY3D(Ceed ceed, ProblemData problem_data, void *ctx) {
   //problem_data->bc_pressure             = BCPressure3D;
   //problem_data->bc_pressure_loc         = BCPressure3D_loc;
   problem_data->has_ts                  = PETSC_FALSE;
-
+  problem_data->view_solution           = app_ctx->view_solution;
   // ------------------------------------------------------
   //              Command line Options
   // ------------------------------------------------------
