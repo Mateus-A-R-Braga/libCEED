@@ -4,6 +4,39 @@
 #include <ceed.h>
 #include <petsc.h>
 
+// PETSc operator contexts
+typedef struct OperatorApplyContext_ *OperatorApplyContext;
+struct OperatorApplyContext_ {
+  MPI_Comm        comm;
+  Vec             X_loc, Y_loc, X_t_loc;
+  CeedVector      x_ceed, y_ceed, x_t_ceed, x_coord, rhs_ceed_H1;
+  CeedOperator    op_apply, op_rhs_H1;
+  DM              dm;
+  Ceed            ceed;
+  CeedScalar      t, dt;
+  CeedContextFieldLabel solution_time_label, final_time_label,
+                        timestep_label;
+  CeedElemRestriction  elem_restr_u_H1;
+  VecType         vec_type;
+};
+
+// libCEED data struct
+typedef struct CeedData_ *CeedData;
+struct CeedData_ {
+  CeedBasis            basis_x, basis_u, basis_p, basis_u_face;
+  CeedElemRestriction  elem_restr_x, elem_restr_u, elem_restr_U_i,
+                       elem_restr_p, elem_restr_p_i, elem_restr_u0,
+                       elem_restr_p0, elem_restr_u_H1;
+  CeedQFunction        qf_residual, qf_jacobian, qf_error, qf_ics_u, qf_ics_p,
+                       qf_rhs_u0, qf_rhs_p0, qf_rhs_H1, qf_post_mass;
+  CeedOperator         op_residual, op_jacobian, op_error, op_ics_u, op_ics_p,
+                       op_rhs_u0, op_rhs_p0, op_rhs_H1, op_post_mass;
+  CeedVector           x_ceed, y_ceed, x_coord, x_t_ceed, rhs_u0_ceed,
+                       u0_ceed, v0_ceed, rhs_p0_ceed, p0_ceed, q0_ceed,
+                       rhs_ceed_H1, u_ceed, up_ceed, vp_ceed;
+  CeedInt              num_elem;
+};
+
 // Application context from user command line options
 typedef struct AppCtx_ *AppCtx;
 struct AppCtx_ {
@@ -20,39 +53,10 @@ struct AppCtx_ {
   char              problem_name[PETSC_MAX_PATH_LEN];
   CeedScalar        t_final, t;
   PetscBool         view_solution, quartic;
-};
-
-// PETSc operator contexts
-typedef struct OperatorApplyContext_ *OperatorApplyContext;
-struct OperatorApplyContext_ {
-  MPI_Comm        comm;
-  Vec             X_loc, Y_loc, X_t_loc;
-  CeedVector      x_ceed, y_ceed, x_t_ceed;
-  CeedOperator    op_apply;
-  DM              dm;
-  Ceed            ceed;
-  CeedScalar      t, dt;
-  CeedContextFieldLabel solution_time_label, final_time_label,
-                        timestep_label;   ;
-};
-
-// libCEED data struct
-typedef struct CeedData_ *CeedData;
-struct CeedData_ {
-  CeedBasis            basis_x, basis_u, basis_p, basis_u_face;
-  CeedElemRestriction  elem_restr_x, elem_restr_u, elem_restr_U_i,
-                       elem_restr_p, elem_restr_p_i, elem_restr_u0,
-                       elem_restr_p0, elem_restr_u_post;
-  CeedQFunction        qf_residual, qf_jacobian, qf_error, qf_ics_u, qf_ics_p,
-                       qf_rhs_u0, qf_rhs_p0, qf_post_rhs, qf_post_mass;
-  CeedOperator         op_residual, op_jacobian, op_error, op_ics_u, op_ics_p,
-                       op_rhs_u0, op_rhs_p0, op_post_rhs, op_post_mass;
-  CeedVector           x_ceed, y_ceed, x_coord, x_t_ceed, rhs_u0_ceed,
-                       u0_ceed, v0_ceed, rhs_p0_ceed, p0_ceed, q0_ceed,
-                       post_rhs_ceed, u_ceed, up_ceed, vp_ceed;
+  char              output_dir[PETSC_MAX_PATH_LEN];
+  PetscInt          output_freq;
   OperatorApplyContext ctx_residual, ctx_jacobian, ctx_error, ctx_residual_ut,
-                       ctx_initial_u0, ctx_initial_p0, ctx_post_Hdiv, ctx_post_H1;
-  CeedInt              num_elem;
+                       ctx_initial_u0, ctx_initial_p0, ctx_Hdiv, ctx_H1;
 };
 
 // Problem specific data

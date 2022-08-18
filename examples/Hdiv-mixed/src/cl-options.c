@@ -55,11 +55,21 @@ PetscErrorCode ProcessCommandLineOptions(AppCtx app_ctx) {
                               NULL, app_ctx->quartic,
                               &(app_ctx->quartic), NULL) );
 
+  PetscCall( PetscStrncpy(app_ctx->output_dir, ".", 2) );
+  PetscCall( PetscOptionsString("-output_dir", "Output directory",
+                                NULL, app_ctx->output_dir, app_ctx->output_dir,
+                                sizeof(app_ctx->output_dir), NULL) );
+
+  app_ctx->output_freq = 10;
+  PetscCall( PetscOptionsInt("-output_freq",
+                             "Frequency of output, in number of steps",
+                             NULL, app_ctx->output_freq, &app_ctx->output_freq, NULL) );
   app_ctx->bc_pressure_count = 16;
   // we can set one face by: -bc_faces 1 OR multiple faces by :-bc_faces 1,2,3
   PetscCall( PetscOptionsIntArray("-bc_faces",
                                   "Face IDs to apply pressure BC",
                                   NULL, app_ctx->bc_faces, &app_ctx->bc_pressure_count, NULL) );
+
 
   PetscOptionsEnd();
 

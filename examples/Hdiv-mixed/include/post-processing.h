@@ -12,11 +12,10 @@ PetscErrorCode PrintOutput(Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
                            Vec U, CeedScalar l2_error_u,
                            CeedScalar l2_error_p);
 PetscErrorCode SetupProjectVelocityCtx_Hdiv(MPI_Comm comm, DM dm, Ceed ceed,
-    CeedData ceed_data, OperatorApplyContext ctx_post_Hdiv);
+    CeedData ceed_data, OperatorApplyContext ctx_Hdiv);
 PetscErrorCode SetupProjectVelocityCtx_H1(MPI_Comm comm, DM dm_H1, Ceed ceed,
-    CeedData ceed_data, OperatorApplyContext ctx_post_H1);
-PetscErrorCode ProjectVelocity(CeedData ceed_data,
-                               Vec U, VecType vec_type, Vec *U_H1,
-                               OperatorApplyContext ctx_post_Hdiv,
-                               OperatorApplyContext ctx_post_H1);
+    CeedData ceed_data, VecType vec_type, OperatorApplyContext ctx_H1);
+PetscErrorCode ProjectVelocity(AppCtx app_ctx,
+                               Vec U, Vec *U_H1);
+PetscErrorCode CtxVecDestroy(AppCtx app_ctx);
 #endif // post_processing_h

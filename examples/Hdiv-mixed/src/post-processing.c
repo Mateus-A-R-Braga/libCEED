@@ -1,5 +1,6 @@
 #include "../include/post-processing.h"
 #include "../include/setup-solvers.h"
+#include "ceed/ceed.h"
 // -----------------------------------------------------------------------------
 // This function print the output
 // -----------------------------------------------------------------------------
@@ -119,43 +120,44 @@ PetscErrorCode PrintOutput(Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
 // -----------------------------------------------------------------------------
 PetscErrorCode SetupProjectVelocityCtx_Hdiv(MPI_Comm comm, DM dm, Ceed ceed,
     CeedData ceed_data,
-    OperatorApplyContext ctx_post_Hdiv) {
+    OperatorApplyContext ctx_Hdiv) {
   PetscFunctionBeginUser;
 
-  ctx_post_Hdiv->comm = comm;
-  ctx_post_Hdiv->dm = dm;
-  PetscCall( DMCreateLocalVector(dm, &ctx_post_Hdiv->X_loc) );
-  ctx_post_Hdiv->x_ceed = ceed_data->u_ceed;
+  ctx_Hdiv->comm = comm;
+  ctx_Hdiv->dm = dm;
+  PetscCall( DMCreateLocalVector(dm, &ctx_Hdiv->X_loc) );
+  ctx_Hdiv->x_ceed = ceed_data->u_ceed;
   //ctx_project_velocity->y_ceed = ceed_data->v0_ceed;
-  ctx_post_Hdiv->ceed = ceed;
+  ctx_Hdiv->ceed = ceed;
   //ctx_project_velocity->op_apply = ceed_data->op_ics_u;
 
   PetscFunctionReturn(0);
 }
 
 PetscErrorCode SetupProjectVelocityCtx_H1(MPI_Comm comm, DM dm_H1, Ceed ceed,
-    CeedData ceed_data,
-    OperatorApplyContext ctx_post_H1) {
+    CeedData ceed_data, VecType vec_type,
+    OperatorApplyContext ctx_H1) {
   PetscFunctionBeginUser;
 
-  ctx_post_H1->comm = comm;
-  ctx_post_H1->dm = dm_H1;
-  PetscCall( DMCreateLocalVector(dm_H1, &ctx_post_H1->X_loc) );
-  PetscCall( VecDuplicate(ctx_post_H1->X_loc, &ctx_post_H1->Y_loc) );
-  ctx_post_H1->x_ceed = ceed_data->up_ceed;
-  ctx_post_H1->y_ceed = ceed_data->vp_ceed;
-  ctx_post_H1->ceed = ceed;
-  ctx_post_H1->op_apply = ceed_data->op_post_mass;
-
+  ctx_H1->comm = comm;
+  ctx_H1->dm = dm_H1;
+  PetscCall( DMCreateLocalVector(dm_H1, &ctx_H1->X_loc) );
+  PetscCall( VecDuplicate(ctx_H1->X_loc, &ctx_H1->Y_loc) );
+  ctx_H1->x_ceed = ceed_data->up_ceed;
+  ctx_H1->y_ceed = ceed_data->vp_ceed;
+  ctx_H1->x_coord = ceed_data->x_coord;
+  ctx_H1->ceed = ceed;
+  ctx_H1->op_apply = ceed_data->op_post_mass;
+  ctx_H1->op_rhs_H1 = ceed_data->op_rhs_H1;
+  ctx_H1->elem_restr_u_H1 = ceed_data->elem_restr_u_H1;
+  ctx_H1->vec_type  = vec_type;
   PetscFunctionReturn(0);
 }
 // -----------------------------------------------------------------------------
 // This function print the output
 // -----------------------------------------------------------------------------
-PetscErrorCode ProjectVelocity(CeedData ceed_data,
-                               Vec U, VecType vec_type, Vec *U_H1,
-                               OperatorApplyContext ctx_post_Hdiv,
-                               OperatorApplyContext ctx_post_H1) {
+PetscErrorCode ProjectVelocity(AppCtx app_ctx,
+                               Vec U, Vec *U_H1) {
 
   PetscFunctionBeginUser;
   const PetscScalar *x;
@@ -164,50 +166,50 @@ PetscErrorCode ProjectVelocity(CeedData ceed_data,
   // ----------------------------------------------
   // Create local rhs for u field
   // ----------------------------------------------
-  Vec post_rhs_loc;
+  Vec rhs_loc_H1;
   PetscScalar *ru;
   PetscMemType ru_mem_type;
-  PetscCall( DMCreateLocalVector(ctx_post_H1->dm, &post_rhs_loc) );
-  PetscCall( VecZeroEntries(post_rhs_loc) );
-  PetscCall( VecGetArrayAndMemType(post_rhs_loc, &ru, &ru_mem_type) );
-  CeedElemRestrictionCreateVector(ceed_data->elem_restr_u_post,
-                                  &ceed_data->post_rhs_ceed,
+  PetscCall( DMCreateLocalVector(app_ctx->ctx_H1->dm, &rhs_loc_H1) );
+  PetscCall( VecZeroEntries(rhs_loc_H1) );
+  PetscCall( VecGetArrayAndMemType(rhs_loc_H1, &ru, &ru_mem_type) );
+  CeedElemRestrictionCreateVector(app_ctx->ctx_H1->elem_restr_u_H1,
+                                  &app_ctx->ctx_H1->rhs_ceed_H1,
                                   NULL);
-  CeedVectorSetArray(ceed_data->post_rhs_ceed, MemTypeP2C(ru_mem_type),
+  CeedVectorSetArray(app_ctx->ctx_H1->rhs_ceed_H1, MemTypeP2C(ru_mem_type),
                      CEED_USE_POINTER, ru);
 
-
-  // Global-to-local: map final U in Hdiv space to local
-  PetscCall( DMGlobalToLocal(ctx_post_Hdiv->dm,
-                             U, INSERT_VALUES, ctx_post_Hdiv->X_loc) );
+  // Global-to-local: map final U in Hdiv space to local vector
+  PetscCall( DMGlobalToLocal(app_ctx->ctx_Hdiv->dm,
+                             U, INSERT_VALUES, app_ctx->ctx_Hdiv->X_loc) );
   // Place Hdiv PETSc vectors in CEED vectors
-  PetscCall( VecGetArrayReadAndMemType(ctx_post_Hdiv->X_loc,
+  PetscCall( VecGetArrayReadAndMemType(app_ctx->ctx_Hdiv->X_loc,
                                        &x, &x_mem_type) );
-  CeedVectorSetArray(ctx_post_Hdiv->x_ceed, MemTypeP2C(x_mem_type),
+  CeedVectorSetArray(app_ctx->ctx_Hdiv->x_ceed, MemTypeP2C(x_mem_type),
                      CEED_USE_POINTER, (PetscScalar *)x);
 
   // Apply operator to create RHS for u field
-  CeedOperatorApply(ceed_data->op_post_rhs, ceed_data->x_coord,
-                    ceed_data->post_rhs_ceed, CEED_REQUEST_IMMEDIATE);
+  CeedOperatorApply(app_ctx->ctx_H1->op_rhs_H1, app_ctx->ctx_H1->x_coord,
+                    app_ctx->ctx_H1->rhs_ceed_H1, CEED_REQUEST_IMMEDIATE);
 
-  // Restore vectors Hdiv vector
-  CeedVectorTakeArray(ctx_post_Hdiv->x_ceed,
+  // Restore Hdiv vector
+  CeedVectorTakeArray(app_ctx->ctx_Hdiv->x_ceed,
                       MemTypeP2C(x_mem_type), NULL);
-  PetscCall( VecRestoreArrayReadAndMemType(ctx_post_Hdiv->X_loc, &x) );
+  PetscCall( VecRestoreArrayReadAndMemType(app_ctx->ctx_Hdiv->X_loc, &x) );
 
   // ----------------------------------------------
   // Create global rhs for u field
   // ----------------------------------------------
-  Vec post_rhs;
-  CeedVectorTakeArray(ceed_data->post_rhs_ceed, MemTypeP2C(ru_mem_type), NULL);
-  PetscCall( VecRestoreArrayAndMemType(post_rhs_loc, &ru) );
-  PetscCall( DMCreateGlobalVector(ctx_post_H1->dm, &post_rhs) );
-  PetscCall( VecZeroEntries(post_rhs) );
-  PetscCall( DMLocalToGlobal(ctx_post_H1->dm, post_rhs_loc, ADD_VALUES,
-                             post_rhs) );
+  Vec rhs_H1;
+  CeedVectorTakeArray(app_ctx->ctx_H1->rhs_ceed_H1, MemTypeP2C(ru_mem_type),
+                      NULL);
+  PetscCall( VecRestoreArrayAndMemType(rhs_loc_H1, &ru) );
+  PetscCall( DMCreateGlobalVector(app_ctx->ctx_H1->dm, &rhs_H1) );
+  PetscCall( VecZeroEntries(rhs_H1) );
+  PetscCall( DMLocalToGlobal(app_ctx->ctx_H1->dm, rhs_loc_H1, ADD_VALUES,
+                             rhs_H1) );
 
   // ----------------------------------------------
-  // Solve for U_H1, M*U_H1 = post_rhs
+  // Solve for U_H1, M*U_H1 = rhs_H1
   // ----------------------------------------------
   PetscInt UH1_g_size, UH1_l_size;
   PetscCall( VecGetSize(*U_H1, &UH1_g_size) );
@@ -217,29 +219,51 @@ PetscErrorCode ProjectVelocity(CeedData ceed_data,
   // Operator
   Mat mat_ksp_projection;
   // -- Form Action of residual on u
-  PetscCall( MatCreateShell(ctx_post_H1->comm, UH1_l_size, UH1_l_size, UH1_g_size,
-                            UH1_g_size, ceed_data->ctx_post_H1, &mat_ksp_projection) );
+  PetscCall( MatCreateShell(app_ctx->comm, UH1_l_size, UH1_l_size, UH1_g_size,
+                            UH1_g_size, app_ctx->ctx_H1, &mat_ksp_projection) );
   PetscCall( MatShellSetOperation(mat_ksp_projection, MATOP_MULT,
                                   (void (*)(void))ApplyMatOp) );
-  PetscCall( MatShellSetVecType(mat_ksp_projection, vec_type) );
+  PetscCall( MatShellSetVecType(mat_ksp_projection, app_ctx->ctx_H1->vec_type) );
 
   KSP ksp_projection;
-  PetscCall( KSPCreate(ctx_post_H1->comm, &ksp_projection) );
+  PetscCall( KSPCreate(app_ctx->ctx_H1->comm, &ksp_projection) );
   PetscCall( KSPSetOperators(ksp_projection, mat_ksp_projection,
                              mat_ksp_projection) );
   PetscCall( KSPSetFromOptions(ksp_projection) );
   PetscCall( KSPSetUp(ksp_projection) );
-  PetscCall( KSPSolve(ksp_projection, post_rhs, *U_H1) );
+  PetscCall( VecZeroEntries(*U_H1) );
+  PetscCall( KSPSolve(ksp_projection, rhs_H1, *U_H1) );
 
   // Clean up
-  PetscCall( VecDestroy(&post_rhs_loc) );
-  PetscCall( VecDestroy(&post_rhs) );
-  PetscCall( VecDestroy(&ctx_post_H1->X_loc) );
-  PetscCall( VecDestroy(&ctx_post_H1->Y_loc) );
-  PetscCall( VecDestroy(&ctx_post_Hdiv->X_loc) );
+  PetscCall( VecDestroy(&rhs_loc_H1) );
+  PetscCall( VecDestroy(&rhs_H1) );
   PetscCall( MatDestroy(&mat_ksp_projection) );
   PetscCall( KSPDestroy(&ksp_projection) );
+  CeedVectorDestroy(&app_ctx->ctx_H1->rhs_ceed_H1);
 
   PetscFunctionReturn(0);
 };
+
+
+PetscErrorCode CtxVecDestroy(AppCtx app_ctx) {
+
+  PetscFunctionBegin;
+  PetscCall( VecDestroy(&app_ctx->ctx_H1->X_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_H1->Y_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_Hdiv->X_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_initial_u0->X_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_initial_u0->Y_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_initial_p0->X_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_initial_p0->Y_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_residual_ut->X_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_residual_ut->X_t_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_residual_ut->Y_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_jacobian->Y_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_jacobian->X_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_residual->Y_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_residual->X_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_error->Y_loc) );
+  PetscCall( VecDestroy(&app_ctx->ctx_error->X_loc) );
+  PetscFunctionReturn(0);
+}
 // -----------------------------------------------------------------------------
