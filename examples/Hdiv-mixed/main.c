@@ -26,6 +26,8 @@
 //   ./main -pc_type svd -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4
 //   ./main -pc_type svd -problem darcy3d -dm_plex_dim 3 -dm_plex_box_faces 4,4,4
 //   ./main -pc_type svd -problem darcy3d -dm_plex_filename /path to the mesh file
+//   ./main -pc_type svd -problem richard2d -dm_plex_dim 2 -dm_plex_box_faces 4,4
+// (boundary is not working)
 //   ./main -pc_type svd -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4 -bc_pressure 1
 //   ./main -pc_type svd -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4 -bc_pressure 1,2,3,4
 const char help[] = "Solve H(div)-mixed problem using PETSc and libCEED\n";
@@ -84,7 +86,7 @@ int main(int argc, char **argv) {
   PetscCall( PetscCalloc1(1, &ctx_error) );
   PetscCall( PetscCalloc1(1, &ctx_Hdiv) );
   PetscCall( PetscCalloc1(1, &ctx_H1) );
-  // Context for Richards problem
+  // Context for Darcy problem
   app_ctx->ctx_residual = ctx_residual;
   app_ctx->ctx_jacobian = ctx_jacobian;
   // Context for Richards problem
