@@ -285,10 +285,10 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, DM dm_H1,
     L2BasisP0(dim, Q, q_ref, q_weights, interp_p, problem_data->quadrature_mode);
     CeedBasisCreateH1(ceed, CEED_TOPOLOGY_QUAD, num_comp_p, 1, num_qpts, interp_p,
                       grad, q_ref,q_weights, &ceed_data->basis_p);
-    //HdivBasisQuad(Q, q_ref, q_weights, interp_u, div,
-    //              CEED_GAUSS_LOBATTO);
-    //CeedBasisCreateHdiv(ceed, CEED_TOPOLOGY_QUAD, num_comp_u, P_u, num_qpts,
-    //                    interp_u, div, q_ref, q_weights, &ceed_data->basis_u_face);
+    HdivBasisQuad(Q, q_ref, q_weights, interp_u, div,
+                  CEED_GAUSS_LOBATTO);
+    CeedBasisCreateHdiv(ceed, CEED_TOPOLOGY_QUAD, num_comp_u, P_u, num_qpts,
+                        interp_u, div, q_ref, q_weights, &ceed_data->basis_u_face);
   } else {
     HdivBasisHex(Q, q_ref, q_weights, interp_u, div, problem_data->quadrature_mode);
     CeedBasisCreateHdiv(ceed, CEED_TOPOLOGY_HEX, num_comp_u, P_u, num_qpts,
@@ -296,9 +296,9 @@ PetscErrorCode SetupLibceed(DM dm, DM dm_u0, DM dm_p0, DM dm_H1,
     L2BasisP0(dim, Q, q_ref, q_weights, interp_p, problem_data->quadrature_mode);
     CeedBasisCreateH1(ceed, CEED_TOPOLOGY_HEX, num_comp_p, 1, num_qpts, interp_p,
                       grad, q_ref,q_weights, &ceed_data->basis_p);
-    //HdivBasisHex(Q, q_ref, q_weights, interp_u, div, CEED_GAUSS_LOBATTO);
-    //CeedBasisCreateHdiv(ceed, CEED_TOPOLOGY_HEX, num_comp_u, P_u, num_qpts,
-    //                    interp_u, div, q_ref, q_weights, &ceed_data->basis_u_face);
+    HdivBasisHex(Q, q_ref, q_weights, interp_u, div, CEED_GAUSS_LOBATTO);
+    CeedBasisCreateHdiv(ceed, CEED_TOPOLOGY_HEX, num_comp_u, P_u, num_qpts,
+                        interp_u, div, q_ref, q_weights, &ceed_data->basis_u_face);
   }
 
   CeedBasisCreateTensorH1Lagrange(ceed, dim, num_comp_x, 2, Q,

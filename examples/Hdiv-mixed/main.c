@@ -158,9 +158,34 @@ int main(int argc, char **argv) {
   // -- Set up libCEED objects
   PetscCall( SetupLibceed(dm, dm_u0, dm_p0, dm_H1, ceed, app_ctx,
                           problem_data, ceed_data) );
-  //CeedVectorView(force_ceed, "%12.8f", stdout);
-  //PetscCall( DMAddBoundariesPressure(ceed, ceed_data, app_ctx, problem_data, dm,
-  //                                   bc_pressure) );
+
+  // ---------------------------------------------------------------------------
+  // Setup pressure boundary conditions
+  // ---------------------------------------------------------------------------
+  // --Create empty local vector for libCEED
+  Vec P_loc;
+  PetscInt P_loc_size;
+  CeedScalar *p0;
+  CeedVector P_ceed;
+  PetscMemType pressure_mem_type;
+  PetscCall( DMCreateLocalVector(dm, &P_loc) );
+  PetscCall( VecGetSize(P_loc, &P_loc_size) );
+  PetscCall( VecZeroEntries(P_loc) );
+  PetscCall( VecGetArrayAndMemType(P_loc, &p0, &pressure_mem_type) );
+  CeedVectorCreate(ceed, P_loc_size, &P_ceed);
+  CeedVectorSetArray(P_ceed, MemTypeP2C(pressure_mem_type), CEED_USE_POINTER,
+                     p0);
+  // -- Apply operator to create local pressure vector on boundary
+  PetscCall( DMAddBoundariesPressure(ceed, ceed_data, app_ctx, problem_data, dm,
+                                     P_ceed) );
+  CeedVectorView(P_ceed, "%12.8f", stdout);
+  // -- Map local to global
+  Vec P;
+  CeedVectorTakeArray(P_ceed, MemTypeP2C(pressure_mem_type), NULL);
+  PetscCall( VecRestoreArrayAndMemType(P_loc, &p0) );
+  PetscCall( DMCreateGlobalVector(dm, &P) );
+  PetscCall( VecZeroEntries(P) );
+  PetscCall( DMLocalToGlobal(dm, P_loc, ADD_VALUES, P) );
 
   // ---------------------------------------------------------------------------
   // Setup context for projection problem; post-processing.c
