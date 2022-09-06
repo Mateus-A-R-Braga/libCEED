@@ -56,6 +56,7 @@ struct DARCYContext_ {
   CeedScalar g;
   CeedScalar rho_a0;
   CeedScalar alpha_a, b_a;
+  CeedScalar lx, ly;
 };
 #endif
 CEED_QFUNCTION(DarcyTrue2D)(void *ctx, const CeedInt Q,
@@ -71,15 +72,18 @@ CEED_QFUNCTION(DarcyTrue2D)(void *ctx, const CeedInt Q,
   const CeedScalar kappa    = context->kappa;
   const CeedScalar alpha_a  = context->alpha_a;
   const CeedScalar b_a      = context->b_a;
+  const CeedScalar lx       = context->lx;
+  const CeedScalar ly       = context->ly;
+
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
     CeedScalar x = coords[i+0*Q], y = coords[i+1*Q];  
-    CeedScalar psi    = sin(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    CeedScalar psi_x  = PI_DOUBLE*cos(PI_DOUBLE*x)*sin(PI_DOUBLE*y);
-    CeedScalar psi_xx  = -PI_DOUBLE*PI_DOUBLE*psi;
-    CeedScalar psi_y  = PI_DOUBLE*sin(PI_DOUBLE*x)*cos(PI_DOUBLE*y);
-    CeedScalar psi_yy  = -PI_DOUBLE*PI_DOUBLE*psi;
+    CeedScalar psi    = sin(PI_DOUBLE*x/lx)*sin(PI_DOUBLE*y/ly);
+    CeedScalar psi_x  = (PI_DOUBLE/lx)*cos(PI_DOUBLE*x/lx)*sin(PI_DOUBLE*y/ly);
+    CeedScalar psi_xx  = -(PI_DOUBLE/lx)*(PI_DOUBLE/lx)*psi;
+    CeedScalar psi_y  = (PI_DOUBLE/ly)*sin(PI_DOUBLE*x/lx)*cos(PI_DOUBLE*y/ly);
+    CeedScalar psi_yy  = -(PI_DOUBLE/ly)*(PI_DOUBLE/ly)*psi;
     // k_r = b_a + alpha_a * (1 - x*y)
     CeedScalar k_r = b_a + alpha_a*(1-x*y);
     CeedScalar k_rx = -alpha_a*y;

@@ -21,23 +21,7 @@
 #define POISSON_MASS3D_H
 
 #include <math.h>
-
-// -----------------------------------------------------------------------------
-// Compute determinant of 3x3 matrix
-// -----------------------------------------------------------------------------
-#ifndef DetMat
-#define DetMat
-CEED_QFUNCTION_HELPER CeedScalar ComputeDetMat(const CeedScalar A[3][3]) {
-  // Compute det(A)
-  const CeedScalar B11 = A[1][1]*A[2][2] - A[1][2]*A[2][1];
-  const CeedScalar B12 = A[0][2]*A[2][1] - A[0][1]*A[2][2];
-  const CeedScalar B13 = A[0][1]*A[1][2] - A[0][2]*A[1][1];
-  CeedScalar detA = A[0][0]*B11 + A[1][0]*B12 + A[2][0]*B13;
-
-  return detA;
-};
-#endif
-
+#include "utils.h"
 // -----------------------------------------------------------------------------
 // This QFunction applies the mass operator for a vector field of 2 components.
 //
@@ -71,24 +55,17 @@ CEED_QFUNCTION(SetupMass3D)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     const CeedScalar J[3][3] = {{dxdX[0][0][i], dxdX[1][0][i], dxdX[2][0][i]},
                                 {dxdX[0][1][i], dxdX[1][1][i], dxdX[2][1][i]},
                                 {dxdX[0][2][i], dxdX[1][2][i], dxdX[2][2][i]}};
-    const CeedScalar detJ = ComputeDetMat(J);
-    const CeedScalar u1[3]   = {u[0][i], u[1][i], u[2][i]};
+    const CeedScalar det_J = MatDet3x3(J);
+    CeedScalar u1[3] = {u[0][i], u[1][i], u[2][i]}, v1[3];
     // *INDENT-ON*
     // Piola map: J^T*J*u*w/detJ
     // 1) Compute J^T * J
-    CeedScalar JTJ[3][3];
-    for (CeedInt j = 0; j < 3; j++) {
-      for (CeedInt k = 0; k < 3; k++) {
-        JTJ[j][k] = 0;
-        for (CeedInt m = 0; m < 3; m++)
-          JTJ[j][k] += J[m][j] * J[m][k];
-      }
-    }
+    CeedScalar JT_J[3][3];
+    AlphaMatTransposeMatMult3x3(1., J, J, JT_J);
     // 2) Compute J^T*J*u * w /detJ
+    AlphaMatVecMult3x3(w[i]/det_J, JT_J, u1, v1);
     for (CeedInt k = 0; k < 3; k++) {
-      v[k][i] = 0;
-      for (CeedInt m = 0; m < 3; m++)
-        v[k][i] += JTJ[k][m] * u1[m] * w[i]/detJ;
+      v[k][i] = v1[k];
     }
   } // End of Quadrature Point Loop
 

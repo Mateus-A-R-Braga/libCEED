@@ -21,7 +21,7 @@
 #define POISSON_MASS2D_H
 
 #include <math.h>
-
+#include "utils.h"
 // -----------------------------------------------------------------------------
 // This QFunction applies the mass operator for a vector field of 2 components.
 //
@@ -54,25 +54,19 @@ CEED_QFUNCTION(SetupMass2D)(void *ctx, CeedInt Q, const CeedScalar *const *in,
     // Setup, J = dx/dX
     const CeedScalar J[2][2] = {{dxdX[0][0][i], dxdX[1][0][i]},
                                 {dxdX[0][1][i], dxdX[1][1][i]}};
-    const CeedScalar detJ = J[0][0]*J[1][1] - J[0][1]*J[1][0];
+    const CeedScalar det_J = MatDet2x2(J);
 
-    const CeedScalar u1[2]   = {u[0][i], u[1][i]};
+    CeedScalar u1[2]   = {u[0][i], u[1][i]}, v1[2];
     // *INDENT-ON*
     // Piola map: J^T*J*u*w/detJ
     // 1) Compute J^T * J
-    CeedScalar JTJ[2][2];
-    for (CeedInt j = 0; j < 2; j++) {
-      for (CeedInt k = 0; k < 2; k++) {
-        JTJ[j][k] = 0;
-        for (CeedInt m = 0; m < 2; m++)
-          JTJ[j][k] += J[m][j] * J[m][k];
-      }
-    }
+    CeedScalar JT_J[2][2];
+    AlphaMatTransposeMatMult2x2(1., J, J, JT_J);
+
     // 2) Compute J^T*J*u * w /detJ
+    AlphaMatVecMult2x2(w[i]/det_J, JT_J, u1, v1);
     for (CeedInt k = 0; k < 2; k++) {
-      v[k][i] = 0;
-      for (CeedInt m = 0; m < 2; m++)
-        v[k][i] += JTJ[k][m] * u1[m] * w[i]/detJ;
+      v[k][i] = v1[k];
     }
   } // End of Quadrature Point Loop
 

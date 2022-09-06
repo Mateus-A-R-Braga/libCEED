@@ -26,7 +26,8 @@
 #include "../qfunctions/darcy-system-quartic2d.h"
 //#include "../qfunctions/pressure-boundary2d.h"
 
-PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
+PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, DM dm,
+                            void *ctx) {
   AppCtx               app_ctx = *(AppCtx *)ctx;
   DARCYContext         darcy_ctx;
   CeedQFunctionContext darcy_context;
@@ -86,11 +87,18 @@ PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, void *ctx) {
                                 b_a, &b_a, NULL));
   PetscOptionsEnd();
 
+  PetscReal domain_min[2], domain_max[2], domain_size[2];
+  PetscCall( DMGetBoundingBox(dm, domain_min, domain_max) );
+  for (PetscInt i=0; i<2; i++) domain_size[i] = domain_max[i] - domain_min[i];
+
+  printf("lx %f, ly %f \n",domain_size[0], domain_size[1]);
   darcy_ctx->kappa = kappa;
   darcy_ctx->rho_a0 = rho_a0;
   darcy_ctx->g = g;
   darcy_ctx->alpha_a = alpha_a;
   darcy_ctx->b_a = b_a;
+  darcy_ctx->lx = domain_size[0];
+  darcy_ctx->ly = domain_size[1];
 
   CeedQFunctionContextCreate(ceed, &darcy_context);
   CeedQFunctionContextSetData(darcy_context, CEED_MEM_HOST, CEED_COPY_VALUES,

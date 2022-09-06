@@ -26,7 +26,8 @@
 //#include "../qfunctions/pressure-boundary2d.h"
 #include "petscsystypes.h"
 
-PetscErrorCode Hdiv_RICHARD3D(Ceed ceed, ProblemData problem_data, void *ctx) {
+PetscErrorCode Hdiv_RICHARD3D(Ceed ceed, ProblemData problem_data, DM dm,
+                              void *ctx) {
   AppCtx               app_ctx = *(AppCtx *)ctx;
   RICHARDContext       richard_ctx;
   CeedQFunctionContext richard_context;
@@ -91,6 +92,10 @@ PetscErrorCode Hdiv_RICHARD3D(Ceed ceed, ProblemData problem_data, void *ctx) {
                                 app_ctx->t_final, &app_ctx->t_final, NULL));
   PetscOptionsEnd();
 
+  PetscReal domain_min[3], domain_max[3], domain_size[3];
+  PetscCall( DMGetBoundingBox(dm, domain_min, domain_max) );
+  for (PetscInt i=0; i<3; i++) domain_size[i] = domain_max[i] - domain_min[i];
+
   richard_ctx->kappa = kappa;
   richard_ctx->alpha_a = alpha_a;
   richard_ctx->b_a = b_a;
@@ -101,6 +106,10 @@ PetscErrorCode Hdiv_RICHARD3D(Ceed ceed, ProblemData problem_data, void *ctx) {
   richard_ctx->gamma = 5.;
   richard_ctx->t = 0.;
   richard_ctx->t_final = app_ctx->t_final;
+  richard_ctx->lx = domain_size[0];
+  richard_ctx->ly = domain_size[1];
+  richard_ctx->lz = domain_size[2];
+
   CeedQFunctionContextCreate(ceed, &richard_context);
   CeedQFunctionContextSetData(richard_context, CEED_MEM_HOST, CEED_COPY_VALUES,
                               sizeof(*richard_ctx), richard_ctx);

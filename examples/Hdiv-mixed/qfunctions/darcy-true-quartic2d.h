@@ -53,6 +53,7 @@ struct DARCYContext_ {
   CeedScalar g;
   CeedScalar rho_a0;
   CeedScalar alpha_a, b_a;
+  CeedScalar lx, ly;
 };
 #endif
 CEED_QFUNCTION(DarcyTrueQuartic2D)(void *ctx, const CeedInt Q,
@@ -63,16 +64,20 @@ CEED_QFUNCTION(DarcyTrueQuartic2D)(void *ctx, const CeedInt Q,
   const CeedScalar (*coords) = in[0]; 
   // Outputs
   CeedScalar (*true_force) = out[0], (*true_solution) = out[1];
+  // Context
+  DARCYContext  context = (DARCYContext)ctx;
+  const CeedScalar lx   = context->lx;
+  const CeedScalar ly   = context->ly;
 
   // Quadrature Point Loop
   CeedPragmaSIMD
   for (CeedInt i=0; i<Q; i++) {
     CeedScalar x = coords[i+0*Q], y = coords[i+1*Q];  
-    CeedScalar psi    = x*(1-x)*y*(1-y);
-    CeedScalar psi_x  = (1-2*x)*y*(1-y);
-    CeedScalar psi_xx  = -2*y*(1-y);
-    CeedScalar psi_y  = x*(1-x)*(1-2*y);
-    CeedScalar psi_yy  = -2*x*(1-x);
+    CeedScalar psi    = x*(lx-x)*y*(ly-y);
+    CeedScalar psi_x  = (lx-2*x)*y*(ly-y);
+    CeedScalar psi_xx  = -2*y*(ly-y);
+    CeedScalar psi_y  = x*(lx-x)*(ly-2*y);
+    CeedScalar psi_yy  = -2*x*(lx-x);
 
     // ue = -grad(\psi)
     CeedScalar ue[2] = {-psi_x, -psi_y};

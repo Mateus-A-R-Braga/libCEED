@@ -101,29 +101,8 @@ int main(int argc, char **argv) {
   app_ctx->ctx_Hdiv = ctx_Hdiv;
   app_ctx->ctx_H1 = ctx_H1;
 
-  // ---------------------------------------------------------------------------
-  // Process command line options
-  // ---------------------------------------------------------------------------
-  // -- Register problems to be available on the command line
-  PetscCall( RegisterProblems_Hdiv(app_ctx) );
-
   // -- Process general command line options
   MPI_Comm comm = PETSC_COMM_WORLD;
-  app_ctx->comm = comm;
-  PetscCall( ProcessCommandLineOptions(app_ctx) );
-
-  // ---------------------------------------------------------------------------
-  // Choose the problem from the list of registered problems
-  // ---------------------------------------------------------------------------
-  {
-    PetscErrorCode (*p)(Ceed, ProblemData, void *);
-    PetscCall( PetscFunctionListFind(app_ctx->problems, app_ctx->problem_name,
-                                     &p) );
-    if (!p) SETERRQ(PETSC_COMM_SELF, 1, "Problem '%s' not found",
-                      app_ctx->problem_name);
-    PetscCall( (*p)(ceed, problem_data, &app_ctx) );
-  }
-
   // ---------------------------------------------------------------------------
   // Create DM
   // ---------------------------------------------------------------------------
@@ -138,7 +117,29 @@ int main(int argc, char **argv) {
   PetscCall( CreateDM(comm, vec_type, &dm_H1) );
   // TODO: add mesh option
   // perturb to have smooth random mesh
-  //PetscCall( PerturbVerticesSmooth(dm) );
+  PetscCall( PerturbVerticesSmooth(dm) );
+  PetscCall( PerturbVerticesSmooth(dm_H1) );
+
+  // ---------------------------------------------------------------------------
+  // Process command line options
+  // ---------------------------------------------------------------------------
+  // -- Register problems to be available on the command line
+  PetscCall( RegisterProblems_Hdiv(app_ctx) );
+
+  app_ctx->comm = comm;
+  PetscCall( ProcessCommandLineOptions(app_ctx) );
+
+  // ---------------------------------------------------------------------------
+  // Choose the problem from the list of registered problems
+  // ---------------------------------------------------------------------------
+  {
+    PetscErrorCode (*p)(Ceed, ProblemData, DM, void *);
+    PetscCall( PetscFunctionListFind(app_ctx->problems, app_ctx->problem_name,
+                                     &p) );
+    if (!p) SETERRQ(PETSC_COMM_SELF, 1, "Problem '%s' not found",
+                      app_ctx->problem_name);
+    PetscCall( (*p)(ceed, problem_data, dm, &app_ctx) );
+  }
 
   // ---------------------------------------------------------------------------
   // Setup FE for H(div) mixed-problem and H1 projection in post-processing.c
@@ -178,7 +179,7 @@ int main(int argc, char **argv) {
   // -- Apply operator to create local pressure vector on boundary
   PetscCall( DMAddBoundariesPressure(ceed, ceed_data, app_ctx, problem_data, dm,
                                      P_ceed) );
-  CeedVectorView(P_ceed, "%12.8f", stdout);
+  //CeedVectorView(P_ceed, "%12.8f", stdout);
   // -- Map local to global
   Vec P;
   CeedVectorTakeArray(P_ceed, MemTypeP2C(pressure_mem_type), NULL);

@@ -22,6 +22,7 @@
 
 #include <math.h>
 #include <ceed.h>
+#include "ceed/ceed-f64.h"
 #include "utils.h"
 
 // -----------------------------------------------------------------------------
@@ -68,6 +69,7 @@ struct DARCYContext_ {
   CeedScalar g;
   CeedScalar rho_a0;
   CeedScalar alpha_a, b_a;
+  CeedScalar lx, ly;
 };
 #endif
 // -----------------------------------------------------------------------------
