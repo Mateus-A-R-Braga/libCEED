@@ -40,6 +40,7 @@ struct CeedData_ {
 // Application context from user command line options
 typedef struct AppCtx_ *AppCtx;
 struct AppCtx_ {
+  char              ceed_resource[PETSC_MAX_PATH_LEN]; // libCEED backend
   MPI_Comm          comm;
   // Degree of polynomial (1 only), extra quadrature pts
   PetscInt          degree;

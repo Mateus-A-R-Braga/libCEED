@@ -23,10 +23,21 @@
 PetscErrorCode ProcessCommandLineOptions(AppCtx app_ctx) {
 
   PetscBool problem_flag = PETSC_FALSE;
+  PetscBool ceed_flag = PETSC_FALSE;
   PetscFunctionBeginUser;
 
   PetscOptionsBegin(app_ctx->comm, NULL, "H(div) examples in PETSc with libCEED",
                     NULL);
+
+  PetscCall( PetscOptionsString("-ceed", "CEED resource specifier",
+                                NULL, app_ctx->ceed_resource, app_ctx->ceed_resource,
+                                sizeof(app_ctx->ceed_resource), &ceed_flag) );
+
+  // Provide default ceed resource if not specified
+  if (!ceed_flag) {
+    const char *ceed_resource = "/cpu/self";
+    strncpy(app_ctx->ceed_resource, ceed_resource, 10);
+  }
 
   PetscCall( PetscOptionsFList("-problem", "Problem to solve", NULL,
                                app_ctx->problems,

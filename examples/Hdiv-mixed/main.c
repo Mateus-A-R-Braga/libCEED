@@ -41,29 +41,6 @@ int main(int argc, char **argv) {
   PetscCall( PetscInitialize(&argc, &argv, NULL, help) );
 
   // ---------------------------------------------------------------------------
-  // Initialize libCEED
-  // ---------------------------------------------------------------------------
-  // -- Initialize backend
-  Ceed ceed;
-  CeedInit("/cpu/self/ref/serial", &ceed);
-  CeedMemType mem_type_backend;
-  CeedGetPreferredMemType(ceed, &mem_type_backend);
-
-  VecType        vec_type = NULL;
-  switch (mem_type_backend) {
-  case CEED_MEM_HOST: vec_type = VECSTANDARD; break;
-  case CEED_MEM_DEVICE: {
-    const char *resolved;
-    CeedGetResource(ceed, &resolved);
-    if (strstr(resolved, "/gpu/cuda")) vec_type = VECCUDA;
-    else if (strstr(resolved, "/gpu/hip/occa"))
-      vec_type = VECSTANDARD; // https://github.com/CEED/libCEED/issues/678
-    else if (strstr(resolved, "/gpu/hip")) vec_type = VECHIP;
-    else vec_type = VECSTANDARD;
-  }
-  }
-
-  // ---------------------------------------------------------------------------
   // Create structs
   // ---------------------------------------------------------------------------
   AppCtx app_ctx;
@@ -100,6 +77,30 @@ int main(int argc, char **argv) {
   // Context for post-processing
   app_ctx->ctx_Hdiv = ctx_Hdiv;
   app_ctx->ctx_H1 = ctx_H1;
+
+  // ---------------------------------------------------------------------------
+  // Initialize libCEED
+  // ---------------------------------------------------------------------------
+  // -- Initialize backend
+  Ceed ceed;
+  //CeedInit("/cpu/self/ref/serial", &ceed);
+  CeedInit(app_ctx->ceed_resource, &ceed);
+  CeedMemType mem_type_backend;
+  CeedGetPreferredMemType(ceed, &mem_type_backend);
+
+  VecType        vec_type = NULL;
+  switch (mem_type_backend) {
+  case CEED_MEM_HOST: vec_type = VECSTANDARD; break;
+  case CEED_MEM_DEVICE: {
+    const char *resolved;
+    CeedGetResource(ceed, &resolved);
+    if (strstr(resolved, "/gpu/cuda")) vec_type = VECCUDA;
+    else if (strstr(resolved, "/gpu/hip/occa"))
+      vec_type = VECSTANDARD; // https://github.com/CEED/libCEED/issues/678
+    else if (strstr(resolved, "/gpu/hip")) vec_type = VECHIP;
+    else vec_type = VECSTANDARD;
+  }
+  }
 
   // -- Process general command line options
   MPI_Comm comm = PETSC_COMM_WORLD;
