@@ -12,5 +12,6 @@
 // ---------------------------------------------------------------------------
 PetscErrorCode CreateDM(MPI_Comm comm, VecType vec_type, DM *dm);
 PetscErrorCode PerturbVerticesSmooth(DM dm);
+PetscErrorCode PerturbVerticesRandom(DM dm);
 
 #endif // setupdm_h

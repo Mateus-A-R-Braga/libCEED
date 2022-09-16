@@ -1389,35 +1389,25 @@ int CeedBasisGetQWeights(CeedBasis basis, const CeedScalar **q_weight) {
   @ref Advanced
 **/
 int CeedBasisGetInterp(CeedBasis basis, const CeedScalar **interp) {
-  switch (basis->basis_space) {
-  case 1: // H^1 discretization
-    if (!basis->interp && basis->tensor_basis) {
-      // Allocate
-      int ierr;
-      ierr = CeedMalloc(basis->Q*basis->P, &basis->interp); CeedChk(ierr);
+  if (!basis->interp && basis->tensor_basis) {
+    // Allocate
+    int ierr;
+    ierr = CeedMalloc(basis->Q*basis->P, &basis->interp); CeedChk(ierr);
 
-      // Initialize
-      for (CeedInt i=0; i<basis->Q*basis->P; i++)
-        basis->interp[i] = 1.0;
+    // Initialize
+    for (CeedInt i=0; i<basis->Q*basis->P; i++)
+      basis->interp[i] = 1.0;
 
-      // Calculate
-      for (CeedInt d=0; d<basis->dim; d++)
-        for (CeedInt qpt=0; qpt<basis->Q; qpt++)
-          for (CeedInt node=0; node<basis->P; node++) {
-            CeedInt p = (node / CeedIntPow(basis->P_1d, d)) % basis->P_1d;
-            CeedInt q = (qpt / CeedIntPow(basis->Q_1d, d)) % basis->Q_1d;
-            basis->interp[qpt*(basis->P)+node] *= basis->interp_1d[q*basis->P_1d+p];
-          }
-    }
-    *interp = basis->interp;
-    break;
-  case 2: // H(div) discretization
-    *interp = basis->interp;
-    break;
-  case 0: // L2 discretization
-    *interp = basis->interp;
-    break;
+    // Calculate
+    for (CeedInt d=0; d<basis->dim; d++)
+      for (CeedInt qpt=0; qpt<basis->Q; qpt++)
+        for (CeedInt node=0; node<basis->P; node++) {
+          CeedInt p = (node / CeedIntPow(basis->P_1d, d)) % basis->P_1d;
+          CeedInt q = (qpt / CeedIntPow(basis->Q_1d, d)) % basis->Q_1d;
+          basis->interp[qpt*(basis->P)+node] *= basis->interp_1d[q*basis->P_1d+p];
+        }
   }
+  *interp = basis->interp;
   return CEED_ERROR_SUCCESS;
 }
 

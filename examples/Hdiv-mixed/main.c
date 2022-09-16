@@ -24,12 +24,14 @@
 // Build with: make
 // Run with:
 //   ./main -pc_type svd -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4
+//   ./main -pc_type none -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4 -ksp_type minres
 //   ./main -pc_type svd -problem darcy3d -dm_plex_dim 3 -dm_plex_box_faces 4,4,4
 //   ./main -pc_type svd -problem darcy3d -dm_plex_filename /path to the mesh file
 //   ./main -pc_type svd -problem richard2d -dm_plex_dim 2 -dm_plex_box_faces 4,4
 // (boundary is not working)
 //   ./main -pc_type svd -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4 -bc_pressure 1
 //   ./main -pc_type svd -problem darcy2d -dm_plex_dim 2 -dm_plex_box_faces 4,4 -bc_pressure 1,2,3,4
+//   ./main -pc_type svd -problem darcy3d -dm_plex_dim 3 -dm_plex_box_faces 4,4,4 -view_solution -dm_plex_box_lower 0,0,0 -dm_plex_box_upper 1,0.1,1
 const char help[] = "Solve H(div)-mixed problem using PETSc and libCEED\n";
 
 #include "main.h"
@@ -83,8 +85,8 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // -- Initialize backend
   Ceed ceed;
-  //CeedInit("/cpu/self/ref/serial", &ceed);
-  CeedInit(app_ctx->ceed_resource, &ceed);
+  CeedInit("/cpu/self/ref/serial", &ceed);
+  //CeedInit(app_ctx->ceed_resource, &ceed);
   CeedMemType mem_type_backend;
   CeedGetPreferredMemType(ceed, &mem_type_backend);
 
@@ -118,9 +120,11 @@ int main(int argc, char **argv) {
   PetscCall( CreateDM(comm, vec_type, &dm_H1) );
   // TODO: add mesh option
   // perturb to have smooth random mesh
-  PetscCall( PerturbVerticesSmooth(dm) );
-  PetscCall( PerturbVerticesSmooth(dm_H1) );
+  //PetscCall( PerturbVerticesSmooth(dm) );
+  //PetscCall( PerturbVerticesSmooth(dm_H1) );
 
+  //PetscCall(PerturbVerticesRandom(dm) );
+  //PetscCall(PerturbVerticesRandom(dm_H1) );
   // ---------------------------------------------------------------------------
   // Process command line options
   // ---------------------------------------------------------------------------

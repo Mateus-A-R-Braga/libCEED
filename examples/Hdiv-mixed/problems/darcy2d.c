@@ -91,7 +91,6 @@ PetscErrorCode Hdiv_DARCY2D(Ceed ceed, ProblemData problem_data, DM dm,
   PetscCall( DMGetBoundingBox(dm, domain_min, domain_max) );
   for (PetscInt i=0; i<2; i++) domain_size[i] = domain_max[i] - domain_min[i];
 
-  printf("lx %f, ly %f \n",domain_size[0], domain_size[1]);
   darcy_ctx->kappa = kappa;
   darcy_ctx->rho_a0 = rho_a0;
   darcy_ctx->g = g;
