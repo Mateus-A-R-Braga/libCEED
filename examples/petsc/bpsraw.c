@@ -740,6 +740,8 @@ int main(int argc, char **argv) {
                               bp_options[bp_choice].error_loc, &qf_error);
   CeedQFunctionAddInput(qf_error, "u", num_comp_u, CEED_EVAL_INTERP);
   CeedQFunctionAddInput(qf_error, "true_soln", num_comp_u, CEED_EVAL_NONE);
+  CeedQFunctionAddInput(qf_error, "qdata", bp_options[bp_choice].q_data_size,
+                        CEED_EVAL_NONE);
   CeedQFunctionAddOutput(qf_error, "error", num_comp_u, CEED_EVAL_NONE);
 
   // Create the persistent vectors that will be needed in setup
@@ -789,6 +791,8 @@ int main(int argc, char **argv) {
   CeedOperatorSetField(op_error, "u", elem_restr_u, basis_u, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op_error, "true_soln", elem_restr_u_i,
                        CEED_BASIS_COLLOCATED, target);
+  CeedOperatorSetField(op_error, "qdata", elem_restr_qd_i,
+                       CEED_BASIS_COLLOCATED, q_data);
   CeedOperatorSetField(op_error, "error", elem_restr_u_i, CEED_BASIS_COLLOCATED,
                        CEED_VECTOR_ACTIVE);
 

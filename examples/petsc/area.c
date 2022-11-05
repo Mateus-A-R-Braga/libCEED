@@ -80,7 +80,7 @@ int main(int argc, char **argv) {
             simplex = PETSC_FALSE;
   Vec U, U_loc, V, V_loc;
   DM  dm;
-  UserO user;
+  OperatorApplyContext op_apply_ctx;
   Ceed ceed;
   CeedData ceed_data;
   ProblemType problem_choice;
@@ -152,8 +152,8 @@ int main(int argc, char **argv) {
   ierr = VecDuplicate(U, &V); CHKERRQ(ierr);
   ierr = VecDuplicate(U_loc, &V_loc); CHKERRQ(ierr);
 
-  // Setup user structure
-  ierr = PetscMalloc1(1, &user); CHKERRQ(ierr);
+  // Setup op_apply_ctx structure
+  ierr = PetscMalloc1(1, &op_apply_ctx); CHKERRQ(ierr);
 
   // Set up libCEED
   CeedInit(ceed_resource, &ceed);
@@ -261,7 +261,7 @@ int main(int argc, char **argv) {
   ierr = VecDestroy(&U_loc); CHKERRQ(ierr);
   ierr = VecDestroy(&V); CHKERRQ(ierr);
   ierr = VecDestroy(&V_loc); CHKERRQ(ierr);
-  ierr = PetscFree(user); CHKERRQ(ierr);
+  ierr = PetscFree(op_apply_ctx); CHKERRQ(ierr);
   ierr = CeedDataDestroy(0, ceed_data); CHKERRQ(ierr);
   CeedDestroy(&ceed);
   return PetscFinalize();

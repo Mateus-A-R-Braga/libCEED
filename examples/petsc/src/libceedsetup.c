@@ -197,6 +197,7 @@ PetscErrorCode SetupLibceedByDegree(DM dm, Ceed ceed, CeedInt degree,
   data->q_data = q_data;
   data->x_ceed = x_ceed;
   data->y_ceed = y_ceed;
+  data->q_data_size = q_data_size;
 
   PetscFunctionReturn(0);
 };
