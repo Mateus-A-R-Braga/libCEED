@@ -90,19 +90,21 @@ int main(int argc, char **argv) {
   CeedMemType mem_type_backend;
   CeedGetPreferredMemType(ceed, &mem_type_backend);
 
-  VecType        vec_type = NULL;
+  VecType vec_type = NULL;
+  MatType mat_type = NULL;
   switch (mem_type_backend) {
   case CEED_MEM_HOST: vec_type = VECSTANDARD; break;
   case CEED_MEM_DEVICE: {
     const char *resolved;
     CeedGetResource(ceed, &resolved);
     if (strstr(resolved, "/gpu/cuda")) vec_type = VECCUDA;
-    else if (strstr(resolved, "/gpu/hip/occa"))
-      vec_type = VECSTANDARD; // https://github.com/CEED/libCEED/issues/678
-    else if (strstr(resolved, "/gpu/hip")) vec_type = VECHIP;
+    else if (strstr(resolved, "/gpu/hip")) vec_type = VECKOKKOS;
     else vec_type = VECSTANDARD;
   }
   }
+  if (strstr(vec_type, VECCUDA)) mat_type = MATAIJCUSPARSE;
+  else if (strstr(vec_type, VECKOKKOS)) mat_type = MATAIJKOKKOS;
+  else mat_type = MATAIJ;
 
   // -- Process general command line options
   MPI_Comm comm = PETSC_COMM_WORLD;
@@ -111,20 +113,22 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   DM  dm, dm_u0, dm_p0, dm_H1;
   // DM for mixed problem
-  PetscCall( CreateDM(comm, vec_type, &dm) );
+  PetscCall( CreateDM(comm, mat_type, vec_type, &dm) );
   // DM for projecting initial velocity to Hdiv space
-  PetscCall( CreateDM(comm, vec_type, &dm_u0) );
+  PetscCall( CreateDM(comm, mat_type, vec_type, &dm_u0) );
   // DM for projecting initial pressure in L2
-  PetscCall( CreateDM(comm, vec_type, &dm_p0) );
+  PetscCall( CreateDM(comm, mat_type, vec_type, &dm_p0) );
   // DM for projecting solution U into H1 space for PetscViewer
-  PetscCall( CreateDM(comm, vec_type, &dm_H1) );
+  PetscCall( CreateDM(comm, mat_type, vec_type, &dm_H1) );
   // TODO: add mesh option
-  // perturb to have smooth random mesh
+  // perturb dm to have smooth random mesh
   //PetscCall( PerturbVerticesSmooth(dm) );
   //PetscCall( PerturbVerticesSmooth(dm_H1) );
 
+  // perturb dm to have random mesh
   //PetscCall(PerturbVerticesRandom(dm) );
   //PetscCall(PerturbVerticesRandom(dm_H1) );
+
   // ---------------------------------------------------------------------------
   // Process command line options
   // ---------------------------------------------------------------------------
@@ -253,7 +257,8 @@ int main(int argc, char **argv) {
   // ---------------------------------------------------------------------------
   // Print solver iterations and final norms
   // ---------------------------------------------------------------------------
-  PetscCall( PrintOutput(ceed, app_ctx, problem_data->has_ts, mem_type_backend,
+  PetscCall( PrintOutput(dm, ceed, app_ctx, problem_data->has_ts,
+                         mem_type_backend,
                          ts, snes, ksp, U, l2_error_u, l2_error_p) );
 
   // ---------------------------------------------------------------------------

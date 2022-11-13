@@ -4,13 +4,15 @@
 // ---------------------------------------------------------------------------
 // Setup DM
 // ---------------------------------------------------------------------------
-PetscErrorCode CreateDM(MPI_Comm comm, VecType vec_type, DM *dm) {
+PetscErrorCode CreateDM(MPI_Comm comm, MatType mat_type,
+                        VecType vec_type, DM *dm) {
 
   PetscFunctionBeginUser;
 
   // Create DMPLEX
   PetscCall( DMCreate(comm, dm) );
   PetscCall( DMSetType(*dm, DMPLEX) );
+  PetscCall( DMSetMatType(*dm, mat_type) );
   PetscCall( DMSetVecType(*dm, vec_type) );
   // Set Tensor elements
   PetscCall( PetscOptionsSetValue(NULL, "-dm_plex_simplex", "0") );

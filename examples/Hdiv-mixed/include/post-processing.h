@@ -6,7 +6,7 @@
 
 #include "structs.h"
 #include "../include/setup-libceed.h"
-PetscErrorCode PrintOutput(Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
+PetscErrorCode PrintOutput(DM dm, Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
                            CeedMemType mem_type_backend,
                            TS ts, SNES snes, KSP ksp,
                            Vec U, CeedScalar l2_error_u,

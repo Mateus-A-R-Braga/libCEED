@@ -4,7 +4,7 @@
 // -----------------------------------------------------------------------------
 // This function print the output
 // -----------------------------------------------------------------------------
-PetscErrorCode PrintOutput(Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
+PetscErrorCode PrintOutput(DM dm, Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
                            CeedMemType mem_type_backend,
                            TS ts, SNES snes, KSP ksp,
                            Vec U, CeedScalar l2_error_u, CeedScalar l2_error_p) {
@@ -27,12 +27,15 @@ PetscErrorCode PrintOutput(Ceed ceed, AppCtx app_ctx, PetscBool has_ts,
                          "    libCEED Backend MemType            : %s\n",
                          hostname, comm_size, used_resource, CeedMemTypes[mem_type_backend]) );
 
-  VecType vecType;
-  PetscCall( VecGetType(U, &vecType) );
+  MatType mat_type;
+  VecType vec_type;
+  PetscCall( DMGetMatType(dm, &mat_type) );
+  PetscCall( DMGetVecType(dm, &vec_type) );
   PetscCall( PetscPrintf(app_ctx->comm,
                          "  PETSc:\n"
-                         "    PETSc Vec Type                     : %s\n",
-                         vecType) );
+                         "    DM MatType                         : %s\n"
+                         "    DM VecType                         : %s\n",
+                         mat_type, vec_type) );
 
   PetscInt       U_l_size, U_g_size;
   PetscCall( VecGetSize(U, &U_g_size) );
