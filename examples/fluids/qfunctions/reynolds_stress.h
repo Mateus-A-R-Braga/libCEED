@@ -1,9 +1,30 @@
+#ifndef reynolds_stress_h
+#define reynolds_stress_h
+
+#include <ceed.h>
+#include <math.h>
+#include <stdlib.h>
+#include "newtonian_state.h"
+#include "newtonian_types.h"
+#include "stabilization.h"
+#include "utils.h"
+
 // *****************************************************************************
-// This QFunction calcualtes the diffusive flux to be L2 projected back onto
-// the FE space
+// This QFunction calcualtes the Reynolds stress to be L2 projected back onto
+// the FE space.
 //
-// Note, this should be accompanied by a boundary integral term for consistency.
+// Note, the mean of the product <U_iU_j> is what is projected and the Reynolds
+// stress is computed from <u'_iu'j> = <U_iU_j> - <U_i><U_j>
 // *****************************************************************************
+
+
+
+
+
+
+
+
+
 CEED_QFUNCTION_HELPER int DivDiffusiveFlux(void *ctx, CeedInt Q,
     const CeedScalar *const *in, CeedScalar *const *out,
     StateFromQi_t StateFromQi, StateFromQi_fwd_t StateFromQi_fwd) {
@@ -48,3 +69,47 @@ CEED_QFUNCTION_HELPER int DivDiffusiveFlux(void *ctx, CeedInt Q,
                  Grad_q[1][k][i] * dXdx[1][j] +
                  Grad_q[2][k][i] * dXdx[2][j];
       dx_i[j] = 1.;
+      grad_s[j] = StateFromQi_fwd(context, s, dqi, x_i, dx_i);
+    }
+
+    CeedScalar strain_rate[6], kmstress[6], stress[3][3], Fe[3];
+    KMStrainRate(grad_s, strain_rate);
+    NewtonianStress(context, strain_rate, kmstress);
+    KMUnpack(kmstress, stress);
+    ViscousEnergyFlux(context, s.Y, grad_s, stress, Fe);
+
+    // Total flux
+    CeedScalar DiffFlux[5][3];
+    FluxTotal(ZeroInviscidFluxes, stress, Fe, DiffFlux);
+
+    for (CeedInt j=0; j<3; j++) {
+      for (CeedInt k=0; k<5; k++) {
+        Grad_v[j][k][i] = -wdetJ * (dXdx[j][0] * DiffFlux[k][0] +
+                                    dXdx[j][1] * DiffFlux[k][1] +
+                                    dXdx[j][2] * DiffFlux[k][2]);
+      }
+    }
+
+    CeedScalar Tau_d[5];
+    Tau_diagPrim(context, s, dXdx, dt, Tau_d);
+
+    for (CeedInt j=0; j<5; j++) jac_data[j][i]     = qi[j];
+    for (CeedInt j=0; j<6; j++) jac_data[5+j][i]   = kmstress[j];
+    for (CeedInt j=0; j<3; j++) jac_data[5+6+j][i] = Tau_d[j];
+  } // End Quadrature Point Loop
+
+  // Return
+  return 0;
+}
+
+CEED_QFUNCTION(DivDiffusiveFlux_Conserv)(void *ctx, CeedInt Q,
+    const CeedScalar *const *in, CeedScalar *const *out) {
+  return DivDiffusiveFlux(ctx, Q, in, out, StateFromU, StateFromU_fwd);
+}
+
+CEED_QFUNCTION(DivDiffusiveFlux_Prim)(void *ctx, CeedInt Q,
+                                      const CeedScalar *const *in, CeedScalar *const *out) {
+  return DivDiffusiveFlux(ctx, Q, in, out, StateFromY, StateFromY_fwd);
+}
+
+#endif // reynolds_stress_h
