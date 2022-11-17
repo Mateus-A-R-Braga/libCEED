@@ -28,7 +28,9 @@ CEED_QFUNCTION_HELPER int ReynoldsStress(void *ctx, CeedInt Q,
                    (*x)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[2];
 
   // Outputs
-  CeedScalar (*U_prod)[6][CEED_Q_VLA] = (CeedScalar(*)[6][CEED_Q_VLA])out[0];
+  CeedScalar (*U_prod)[CEED_Q_VLA] = (CeedScalar(*)[CEED_Q_VLA])out[0];
+
+  // CEED_Q_VLA == number of quadrature points
 
   // *INDENT-ON*
   // Context
@@ -54,14 +56,14 @@ CEED_QFUNCTION_HELPER int ReynoldsStress(void *ctx, CeedInt Q,
 //                                   {q_data[7][i], q_data[8][i], q_data[9][i]}
 //                                  };
 
-    CeedScalar U_prod[6];
+   // CeedScalar U_prod[6];
    // Using Voight notation (array ordering)
-    U_prod[0] = qi[1] * qi[1] * wdetJ // U*U
-    U_prod[1] = qi[2] * qi[2] * wdetJ // V*V
-    U_prod[2] = qi[3] * qi[3] * wdetJ // W*W
-    U_prod[3] = qi[2] * qi[3] * wdetJ // V*W
-    U_prod[4] = qi[1] * qi[3] * wdetJ // U*W
-    U_prod[5] = qi[1] * qi[2] * wdetJ // U*V
+    U_prod[0][i] = s.Y.velocity[0] * qi[1] * wdetJ // U*U
+    U_prod[1][i] = s.Y.velocity[1] * qi[2] * wdetJ // V*V
+    U_prod[2][i] = qi[3] * qi[3] * wdetJ // W*W
+    U_prod[3][i] = qi[2] * qi[3] * wdetJ // V*W
+    U_prod[4][i] = qi[1] * qi[3] * wdetJ // U*W
+    U_prod[5][i] = qi[1] * qi[2] * wdetJ // U*V
     
    // Where to multiply wdetJ ?
 

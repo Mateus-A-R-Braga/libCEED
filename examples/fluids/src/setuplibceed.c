@@ -279,6 +279,13 @@ PetscErrorCode SetupLibceed(Ceed ceed, CeedData ceed_data, DM dm, User user, App
     CeedQFunctionAddOutput(ceed_data->qf_rhs_vol, "Grad_v", num_comp_q * dim, CEED_EVAL_GRAD);
   }
 
+
+  // -- 
+  if (problem->apply_vol_rhs.qfunction) {
+    PetscCall(CreateStatsOperator( ........))
+  }
+
+
   // -- Create QFunction for IFunction
   if (problem->apply_vol_ifunction.qfunction) {
     CeedQFunctionCreateInterior(ceed, 1, problem->apply_vol_ifunction.qfunction, problem->apply_vol_ifunction.qfunction_loc,
