@@ -17,15 +17,7 @@
 // stress is computed from <u'_iu'j> = <U_iU_j> - <U_i><U_j>
 // *****************************************************************************
 
-
-
-
-
-
-
-
-
-CEED_QFUNCTION_HELPER int DivDiffusiveFlux(void *ctx, CeedInt Q,
+CEED_QFUNCTION_HELPER int ReynoldsStress(void *ctx, CeedInt Q,
     const CeedScalar *const *in, CeedScalar *const *out,
     StateFromQi_t StateFromQi, StateFromQi_fwd_t StateFromQi_fwd) {
   // *INDENT-OFF*
@@ -34,9 +26,16 @@ CEED_QFUNCTION_HELPER int DivDiffusiveFlux(void *ctx, CeedInt Q,
                    (*Grad_q)[5][CEED_Q_VLA] = (const CeedScalar(*)[5][CEED_Q_VLA])in[1],
                    (*q_data)[CEED_Q_VLA]    = (const CeedScalar(*)[CEED_Q_VLA])in[2],
                    (*x)[CEED_Q_VLA]         = (const CeedScalar(*)[CEED_Q_VLA])in[3];
+  // Grad_q not needed for this example
+
+
   // Outputs
   CeedScalar (*Grad_v)[5][CEED_Q_VLA] = (CeedScalar(*)[5][CEED_Q_VLA])out[0],
              (*jac_data)[CEED_Q_VLA]  = (CeedScalar(*)[CEED_Q_VLA])out[1];
+
+  // Outputs should include the product of U_iU_j
+
+
   // *INDENT-ON*
   // Context
   const NewtonianIdealGasContext context        = (NewtonianIdealGasContext)ctx;
@@ -72,6 +71,8 @@ CEED_QFUNCTION_HELPER int DivDiffusiveFlux(void *ctx, CeedInt Q,
       grad_s[j] = StateFromQi_fwd(context, s, dqi, x_i, dx_i);
     }
 
+
+// HERE DOWN UPDATE TO BE UNIQUE FOR REYNOLDS STRESSES
     CeedScalar strain_rate[6], kmstress[6], stress[3][3], Fe[3];
     KMStrainRate(grad_s, strain_rate);
     NewtonianStress(context, strain_rate, kmstress);
