@@ -6,7 +6,8 @@
 // This file is part of CEED:  http://github.com/ceed
 
 /// @file
-/// Utility functions for setting up problems using the Newtonian Qfunction
+/// Utility functions for setting up problems using the various statistics Qfunctions such as 
+/// qfunctions/reynolds_stress.h
 
 #include "../navierstokes.h"
 #include "../qfunctions/setupgeo.h"
@@ -22,16 +23,9 @@ PetscErrorCode CreateStatsOperator(instance_of_ProblemQFunctionSpec, ceed_data, 
 // setup restriction
 // setup basis
 // create operator
-//
 
   int num_comp_stats = 6;
   CeedQFunction qf_stats
-
-// for Qfunciton
-// create interion
-// set context
-// destroy context
-//
 
   CeedQFunctionCreateInterior(ceed, 1, instance_of_ProblemQFunctionSpec.qfunction, instance_of_ProblemQFcuntionSpec.qfunction_loc, &qf_stats);
   CeedQFunctionSetContext(&qf_stats, instance_of_ProblemQFuncitonSpec.qfunction_context);
