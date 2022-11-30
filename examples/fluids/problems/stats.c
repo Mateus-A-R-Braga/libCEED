@@ -14,8 +14,11 @@
 #include "../qfunctions/reynolds_stress.h"
 
 // Need to make two functions in this file:
-// 1) Function that sets up the Qfunction structure that specifies what qfunciton needs to happen and context for it. This is called inside newtonian_ns (add a flag to turn stats collection on and off)
+// 1) Function that sets up the Qfunction structure that specifies what qfunciton needs to happen and context for it. 
+// This is called inside newtonian_ns (add a flag to turn stats collection on and off)
+// For now just leave blank (it will always do my QFunction this way, add flag later time permitting)
 
+// 2) Create QFunction
 // -- Create QFunction for Reynolds stress
 PetscErrorCode CreateStatsOperator(stats, ceed_data, User){
 // stats could be somthing like the Reynolds stress and is an instance of the problem QFunction specifier
