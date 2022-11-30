@@ -418,9 +418,60 @@ PetscErrorCode TSMonitor_NS(TS ts, PetscInt step_no, PetscReal time, Vec Q, void
   User user = ctx;
   PetscFunctionBeginUser;
 
+  // hard code here the stats function from problems/stats.c 
+
+/*  
+PetscCall(DMGetLocalVector(user->dm, &Flux_loc));
+  if (user->op_fluxproj) {
+    PetscMemType flux_mem_type;
+    PetscScalar *flux;
+    PetscCall(DMGetGlobalVector(user->dm, &Flux));
+    PetscCall(VecGetArrayAndMemType(Flux_loc, &flux, &flux_mem_type));
+    CeedVectorSetArray(user->flux_ceed, MemTypeP2C(flux_mem_type), CEED_USE_POINTER,
+                       flux);
+
+    CeedOperatorApply(user->op_fluxproj, user->q_ceed, user->flux_ceed,
+                      CEED_REQUEST_IMMEDIATE);
+
+    CeedVectorTakeArray(user->flux_ceed, MemTypeP2C(flux_mem_type), &flux);
+    PetscCall(VecRestoreArrayAndMemType(Flux_loc, &flux));
+    PetscCall(VecZeroEntries(Flux));
+    PetscCall(DMLocalToGlobal(user->dm, Flux_loc, ADD_VALUES, Flux));
+
+    // Inverse of the lumped mass matrix (M is Minv)
+    PetscCall(VecPointwiseMult(Flux, Flux, user->M));
+
+    PetscCall(DMGlobalToLocal(user->dm, Flux, INSERT_VALUES, Flux_loc));
+    PetscCall(VecGetArrayAndMemType(Flux_loc, &flux, &flux_mem_type));
+    CeedVectorSetArray(user->flux_ceed, MemTypeP2C(flux_mem_type), CEED_USE_POINTER,
+                       flux);
+
+    PetscCall(DMRestoreGlobalVector(user->dm, &Flux));
+  }
+*/
+
+
+
+
+/*
+// Set up output
+  PetscCall(DMGetLocalVector(user->dm, &Q_loc));
+  PetscCall(PetscObjectSetName((PetscObject)Q_loc, "StateVec"));
+  PetscCall(VecZeroEntries(Q_loc));
+  PetscCall(DMGlobalToLocal(user->dm, Q, INSERT_VALUES, Q_loc));
+
+  // Output
+  PetscCall(
+      PetscSNPrintf(file_path, sizeof file_path, "%s/ns-%03" PetscInt_FMT ".vtu", user->app_ctx->output_dir, step_no + user->app_ctx->cont_steps));
+
+  PetscCall(PetscViewerVTKOpen(PetscObjectComm((PetscObject)Q), file_path, FILE_MODE_WRITE, &viewer));
+  PetscCall(VecView(Q_loc, viewer));
+  PetscCall(PetscViewerDestroy(&viewer));
+  PetscCall(DMRestoreLocalVector(user->dm, &Q_loc));
+*/
+
   // Print every 'output_freq' steps
   if (user->app_ctx->output_freq <= 0 || step_no % user->app_ctx->output_freq != 0) PetscFunctionReturn(0);
-
   PetscCall(WriteOutput(user, Q, step_no, time));
 
   PetscFunctionReturn(0);
