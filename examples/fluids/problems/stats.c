@@ -13,7 +13,8 @@
 #include "../qfunctions/setupgeo.h"
 #include "../qfunctions/reynolds_stress.h"
 
-// Need to make two functions in this file:
+// Need to make two functions in this file
+
 // 1) Function that sets up the Qfunction structure that specifies what qfunciton needs to happen and context for it. 
 // This is called inside newtonian_ns (add a flag to turn stats collection on and off)
 // For now just leave blank (it will always do my QFunction this way, add flag later time permitting)
@@ -27,21 +28,21 @@ PetscErrorCode CreateStatsOperator(stats, ceed_data, User){
 // setup basis
 // create operator
 
-PetscFunctionUserBegin;
-
   int num_comp_q = 5;
   int q_data_size_vol = 10; 
   int num_comp_x = 3;
   int num_comp_stats = 6;
 
+  PetscFunctionBeginUser;
+
   CeedQFunction qf_stats
   CeedQFunctionCreateInterior(ceed, 1, stats.qfunction, rs.qfunction_loc, &qf_stats);
   CeedQFunctionSetContext(&qf_stats, stats.qfunction_context);
   CeedQFunctionContextDestroy(&stats.qfunction_context);
-  CeedQFunctionAddInput(qf_stats, "q", num_comp_q, CEED_EVAL_INTERP); // This sets the QFunction input 
-  CeedQFunctionAddInput(qf_stats, "q_data", q_data_size_vol, CEED_EVAL_NONE); // This sets the QFunction input
-  CeedQFunctionAddInput(qf_stats, "x", num_comp_x, CEED_EVAL_INTERP); // This sets the QFunction input
-  CeedQFunctionAddOutput(qf_stats, "U_prod", num_comp_stats, CEED_EVAL_INTERP); // This sets the Qfunction output
+  CeedQFunctionAddInput(qf_stats, "q", num_comp_q, CEED_EVAL_INTERP); // This sets the QFunction input to be interpolated between quadrature points 
+  CeedQFunctionAddInput(qf_stats, "q_data", q_data_size_vol, CEED_EVAL_NONE); // This sets the QFunction input to just be at quadrature points
+  CeedQFunctionAddInput(qf_stats, "x", num_comp_x, CEED_EVAL_INTERP); // This sets the QFunction input to be interpolated between quadrature points
+  CeedQFunctionAddOutput(qf_stats, "U_prod", num_comp_stats, CEED_EVAL_INTERP); // This sets the Qfunction output to be interpolated between quadrature points
 
 // -- CEED setup the basis
   CeedBasisCreateTensorH1Lagrange(ceed, dim, num_comp_stats, P, Q, CEED_GAUSS, &basis_stats); //This creates the basis
@@ -57,6 +58,6 @@ PetscFunctionUserBegin;
 
   User->op_stats = op
 
-PetscFunctionReturn(0);
+  PetscFunctionReturn(0);
 
 }
