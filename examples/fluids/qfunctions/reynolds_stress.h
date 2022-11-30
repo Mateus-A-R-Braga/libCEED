@@ -36,7 +36,7 @@ CEED_QFUNCTION_HELPER int ReynoldsStress(void *ctx, CeedInt Q,
   // *INDENT-ON*
   // Context
   const NewtonianIdealGasContext context        = (NewtonianIdealGasContext)ctx;
-  const CeedScalar dt                           = context->dt;
+//  const CeedScalar dt                           = context->dt;
 
   CeedPragmaSIMD
   // Quadrature Point Loop
@@ -49,12 +49,12 @@ CEED_QFUNCTION_HELPER int ReynoldsStress(void *ctx, CeedInt Q,
     const CeedScalar wdetJ      =   q_data[0][i];
  
     // Using Voight notation (array ordering)
-    U_prod[0][i] = s.Y.velocity[0] * s.Y.velocity[0] * wdetJ // U*U
-    U_prod[1][i] = s.Y.velocity[1] * s.Y.velocity[1] * wdetJ // V*V
-    U_prod[2][i] = s.Y.velocity[2] * s.Y.velocity[2] * wdetJ // W*W
-    U_prod[3][i] = s.Y.velocity[1] * s.Y.velocity[2] * wdetJ // V*W
-    U_prod[4][i] = s.Y.velocity[0] * s.Y.velocity[2] * wdetJ // U*W
-    U_prod[5][i] = s.Y.velocity[0] * s.Y.velocity[1] * wdetJ // U*V
+    U_prod[0][i] = s.Y.velocity[0] * s.Y.velocity[0] * wdetJ; // U*U
+    U_prod[1][i] = s.Y.velocity[1] * s.Y.velocity[1] * wdetJ; // V*V
+    U_prod[2][i] = s.Y.velocity[2] * s.Y.velocity[2] * wdetJ; // W*W
+    U_prod[3][i] = s.Y.velocity[1] * s.Y.velocity[2] * wdetJ; // V*W
+    U_prod[4][i] = s.Y.velocity[0] * s.Y.velocity[2] * wdetJ; // U*W
+    U_prod[5][i] = s.Y.velocity[0] * s.Y.velocity[1] * wdetJ; // U*V
     
   } // End Quadrature Point Loop
 

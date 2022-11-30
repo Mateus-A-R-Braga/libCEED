@@ -35,7 +35,7 @@ PetscErrorCode CreateStatsOperator(stats, ceed_data, User){
 
   PetscFunctionBeginUser;
 
-  CeedQFunction qf_stats
+  CeedQFunction qf_stats;
   CeedQFunctionCreateInterior(ceed, 1, stats.qfunction, rs.qfunction_loc, &qf_stats);
   CeedQFunctionSetContext(&qf_stats, stats.qfunction_context);
   CeedQFunctionContextDestroy(&stats.qfunction_context);
