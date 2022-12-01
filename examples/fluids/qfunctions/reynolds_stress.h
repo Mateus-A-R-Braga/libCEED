@@ -54,7 +54,7 @@ CEED_QFUNCTION_HELPER int ReynoldsStress(void *ctx, CeedInt Q,
     U_prod[2][i] = s.Y.velocity[2] * s.Y.velocity[2] * wdetJ; // W*W
     U_prod[3][i] = s.Y.velocity[1] * s.Y.velocity[2] * wdetJ; // V*W
     U_prod[4][i] = s.Y.velocity[0] * s.Y.velocity[2] * wdetJ; // U*W
-    U_prod[5][i] = s.Y.velocity[0] * s.Y.velocity[1] * wdetJ; // U*V
+    //U_prod[5][i] = s.Y.velocity[0] * s.Y.velocity[1] * wdetJ; // U*V
     
   } // End Quadrature Point Loop
 

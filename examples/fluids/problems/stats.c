@@ -10,8 +10,8 @@
 /// qfunctions/reynolds_stress.h
 
 #include "../navierstokes.h"
-#include "../qfunctions/setupgeo.h"
-#include "../qfunctions/reynolds_stress.h"
+//#include "../qfunctions/setupgeo.h"
+//#include "../qfunctions/reynolds_stress.h"
 
 // Need to make two functions in this file
 
@@ -31,10 +31,13 @@ PetscErrorCode CreateStatsOperator(Ceed ceed, ProblemQFunctionSpec stats, CeedDa
   int num_comp_q = 5;
   int q_data_size_vol = 10; 
   int num_comp_x = 3;
-  int num_comp_stats = 6;
+//  int num_comp_stats = 6;
+  int num_comp_stats = 5;
   CeedBasis basis_stats;
 
   PetscFunctionBeginUser;
+
+  CeedElemRestrictionCreateVector(ceed_data->elem_restr_q, &user->stats_ceed, NULL);
 
   CeedQFunction qf_stats;
   CeedQFunctionCreateInterior(ceed, 1, stats.qfunction, stats.qfunction_loc, &qf_stats);

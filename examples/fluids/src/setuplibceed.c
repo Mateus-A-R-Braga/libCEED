@@ -409,7 +409,7 @@ PetscErrorCode SetupLibceed(Ceed ceed, CeedData ceed_data, DM dm, User user, App
   }
 
   // -- 
-  if (problem->apply_vol_rhs.qfunction) {
+  if (1) {
     switch (user->phys->state_var){
       case STATEVAR_CONSERVATIVE:
         problem->apply_stats.qfunction = ReynoldsStress_Conserv;    
@@ -420,7 +420,9 @@ PetscErrorCode SetupLibceed(Ceed ceed, CeedData ceed_data, DM dm, User user, App
         problem->apply_stats.qfunction_loc = ReynoldsStress_Prim_loc;
         break;
     } 
+    CeedQFunctionContextReferenceCopy(problem->apply_vol_rhs.qfunction_context, &problem->apply_stats.qfunction_context);
     PetscCall(CreateStatsOperator(ceed, problem->apply_stats, ceed_data, user, dim, P, Q));
+    //CeedVectorSetValuedd
   }
 
   // *****************************************************************************
