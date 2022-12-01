@@ -7,6 +7,7 @@ ts:
   type: 'beuler'
   adapt_type: 'none'
   dt: 5e-6
+  max_steps: 5  
 
 dm_plex_box_lower: 0,0,0
 dm_plex_box_upper: .01,.01,.001
