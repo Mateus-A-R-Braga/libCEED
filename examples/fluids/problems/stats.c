@@ -21,7 +21,7 @@
 
 // 2) Create QFunction
 // -- Create QFunction for Reynolds stress
-PetscErrorCode CreateStatsOperator(stats, ceed_data, User){
+PetscErrorCode CreateStatsOperator(stats, ceed_data, User) {
 // stats could be somthing like the Reynolds stress and is an instance of the problem QFunction specifier
 
 // setup restriction

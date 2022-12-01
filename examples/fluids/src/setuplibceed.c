@@ -282,7 +282,7 @@ PetscErrorCode SetupLibceed(Ceed ceed, CeedData ceed_data, DM dm, User user, App
 
   // -- 
   if (problem->apply_vol_rhs.qfunction) {
-    PetscCall(CreateStatsOperator( ........))
+    PetscCall(CreateStatsOperator(stats, ceed_data, User));
   }
 
 

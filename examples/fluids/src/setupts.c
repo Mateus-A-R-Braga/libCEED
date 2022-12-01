@@ -416,7 +416,13 @@ PetscErrorCode WriteOutput(User user, Vec Q, PetscInt step_no, PetscScalar time)
 // User provided TS Monitor
 PetscErrorCode TSMonitor_NS(TS ts, PetscInt step_no, PetscReal time, Vec Q, void *ctx) {
   User user = ctx;
-  char file_path[8] = "vel_prod"
+//  Vec stats_loc;
+  Vec Q_loc;
+  Vec stats_loc;
+  char file_path[8] = "vel_prod";
+//  char file_path[PETSC_MAX_PATH_LEN];
+  PetscViewer viewer;
+
   PetscFunctionBeginUser;
 
   // hard code here the stats function from problems/stats.c 
