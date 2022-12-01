@@ -419,6 +419,7 @@ PetscErrorCode TSMonitor_NS(TS ts, PetscInt step_no, PetscReal time, Vec Q, void
 //  Vec stats_loc;
   Vec Q_loc;
   Vec stats_loc;
+  Vec Stats;
   char file_path[8] = "vel_prod";
 //  char file_path[PETSC_MAX_PATH_LEN];
   PetscViewer viewer;
@@ -430,7 +431,7 @@ PetscErrorCode TSMonitor_NS(TS ts, PetscInt step_no, PetscReal time, Vec Q, void
     if (user->op_stats) {
       PetscMemType stats_mem_type;
       PetscScalar *stats;
-      PetscCall(DMGetGlobalVector(user->dm, &stats));
+      PetscCall(DMGetGlobalVector(user->dm, &Stats));
       PetscCall(VecGetArrayAndMemType(stats_loc, &stats, &stats_mem_type));
       CeedVectorSetArray(user->stats_ceed, MemTypeP2C(stats_mem_type), CEED_USE_POINTER, stats);
 
@@ -438,17 +439,15 @@ PetscErrorCode TSMonitor_NS(TS ts, PetscInt step_no, PetscReal time, Vec Q, void
 
       CeedVectorTakeArray(user->stats_ceed, MemTypeP2C(stats_mem_type), &stats);
       PetscCall(VecRestoreArrayAndMemType(stats_loc, &stats));
-      PetscCall(VecZeroEntries(stats));
-      PetscCall(DMLocalToGlobal(user->dm, stats_loc, ADD_VALUES, stats));
+      PetscCall(VecZeroEntries(Stats));
+      PetscCall(DMLocalToGlobal(user->dm, stats_loc, ADD_VALUES, Stats));
 
       // Inverse of the lumped mass matrix (M is Minv)
-      PetscCall(VecPointwiseMult(stats, stats, user->M));
+      PetscCall(VecPointwiseMult(Stats, Stats, user->M));
 
-      PetscCall(DMGlobalToLocal(user->dm, stats, INSERT_VALUES, stats_loc));
-      PetscCall(VecGetArrayAndMemType(stats_loc, &stats, &stats_mem_type));
-      CeedVectorSetArray(user->stats_ceed, MemTypeP2C(stats_mem_type), CEED_USE_POINTER, stats);
+      PetscCall(DMGlobalToLocal(user->dm, Stats, INSERT_VALUES, stats_loc));
 
-      PetscCall(DMRestoreGlobalVector(user->dm, &stats));
+      PetscCall(DMRestoreGlobalVector(user->dm, &Stats));
     }
 
   // Set up output

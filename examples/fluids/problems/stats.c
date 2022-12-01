@@ -21,7 +21,7 @@
 
 // 2) Create QFunction
 // -- Create QFunction for Reynolds stress
-PetscErrorCode CreateStatsOperator(stats, ceed_data, User) {
+PetscErrorCode CreateStatsOperator(Ceed ceed, ProblemQFunctionSpec stats, CeedData ceed_data, User user, CeedInt dim, CeedInt P, CeedInt Q) {
 // stats could be somthing like the Reynolds stress and is an instance of the problem QFunction specifier
 
 // setup restriction
@@ -32,12 +32,13 @@ PetscErrorCode CreateStatsOperator(stats, ceed_data, User) {
   int q_data_size_vol = 10; 
   int num_comp_x = 3;
   int num_comp_stats = 6;
+  CeedBasis basis_stats;
 
   PetscFunctionBeginUser;
 
   CeedQFunction qf_stats;
-  CeedQFunctionCreateInterior(ceed, 1, stats.qfunction, rs.qfunction_loc, &qf_stats);
-  CeedQFunctionSetContext(&qf_stats, stats.qfunction_context);
+  CeedQFunctionCreateInterior(ceed, 1, stats.qfunction, stats.qfunction_loc, &qf_stats);
+  CeedQFunctionSetContext(qf_stats, stats.qfunction_context);
   CeedQFunctionContextDestroy(&stats.qfunction_context);
   CeedQFunctionAddInput(qf_stats, "q", num_comp_q, CEED_EVAL_INTERP); // This sets the QFunction input to be interpolated between quadrature points 
   CeedQFunctionAddInput(qf_stats, "q_data", q_data_size_vol, CEED_EVAL_NONE); // This sets the QFunction input to just be at quadrature points
@@ -53,10 +54,10 @@ PetscErrorCode CreateStatsOperator(stats, ceed_data, User) {
   CeedOperatorSetField(op, "q", ceed_data->elem_restr_q, ceed_data->basis_q, CEED_VECTOR_ACTIVE);
   CeedOperatorSetField(op, "q_data", ceed_data->elem_restr_qd_i, CEED_BASIS_COLLOCATED, ceed_data->q_data);
   CeedOperatorSetField(op, "x", ceed_data->elem_restr_x, ceed_data->basis_x, ceed_data->x_coord);
-  CeedOperatorSetField(op, "U_prod", ceed_data->elem_restr_q, ceed_data->basis_q, CEED_VECTOR_ACTIVE);
+  CeedOperatorSetField(op, "U_prod", ceed_data->elem_restr_q, basis_stats, CEED_VECTOR_ACTIVE);
   CeedQFunctionDestroy(&qf_stats);
 
-  User->op_stats = op
+  user->op_stats = op;
 
   PetscFunctionReturn(0);
 
