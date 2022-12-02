@@ -1,12 +1,18 @@
 problem: 'channel'
-mu: .01
+state_var: 'primitive'
 
+mu: .01
+k: .01
+cp: 1000
+theta0: 300
 umax: 40
+
 implicit: true
 ts:
   type: 'beuler'
   adapt_type: 'none'
   dt: 5e-6
+  max_steps: 5
 
 dm_plex_box_lower: 0,0,0
 dm_plex_box_upper: .01,.01,.001
