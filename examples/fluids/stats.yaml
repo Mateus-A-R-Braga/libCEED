@@ -11,13 +11,13 @@ implicit: true
 ts:
   type: 'beuler'
   adapt_type: 'none'
-  dt: 5e-6
-  max_steps: 5
+  dt: 2.5e-6
+  max_steps: 30
 
 dm_plex_box_lower: 0,0,0
 dm_plex_box_upper: .01,.01,.001
 dm_plex_dim: 3
-degree: 1
+degree: 2
 dm_plex_box_faces: 10,10,1
 bc_slip_z: 1,2
 bc_wall: 3,4
