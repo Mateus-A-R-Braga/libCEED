@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include "newtonian_state.h"
 #include "newtonian_types.h"
-#include "stabilization.h"
-#include "utils.h"
+//#include "stabilization.h"
+//#include "utils.h"
 
 // *****************************************************************************
 // This QFunction calcualtes the Reynolds stress to be L2 projected back onto
