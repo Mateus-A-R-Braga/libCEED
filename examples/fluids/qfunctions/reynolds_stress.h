@@ -56,10 +56,10 @@ CEED_QFUNCTION_HELPER int ReynoldsStress(void *ctx, CeedInt Q,
     //U_prod[4][i] = s.Y.velocity[0] * s.Y.velocity[2] * wdetJ; // U*W
     //U_prod[5][i] = s.Y.velocity[0] * s.Y.velocity[1] * wdetJ; // U*V
  
-    U_prod[0][i] = s.Y.velocity[0] * s.Y.temperature * wdetJ; // U*T
+    U_prod[0][i] = s.Y.pressure * s.Y.pressure * wdetJ; // P*P
     U_prod[1][i] = s.Y.velocity[0] * s.Y.velocity[0] * wdetJ; // U*U
     U_prod[2][i] = s.Y.velocity[0] * s.Y.velocity[1] * wdetJ; // U*V
-    U_prod[3][i] = s.Y.pressure * s.Y.pressure * wdetJ; // P*P
+    U_prod[3][i] = s.Y.velocity[0] * s.Y.temperature * wdetJ; // U*T
     U_prod[4][i] = s.Y.temperature * s.Y.temperature * wdetJ; // T*T
     
 
