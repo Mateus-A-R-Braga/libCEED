@@ -451,7 +451,7 @@ PetscErrorCode TSMonitor_NS(TS ts, PetscInt step_no, PetscReal time, Vec Q, void
       PetscCall(VecZeroEntries(Stats));
       PetscCall(DMLocalToGlobal(user->dm, stats_loc, ADD_VALUES, Stats));
 
-      // Inverse of the lumped mass matrix (M is Minv)
+      // Do the multiplication by the inverse of the lumped mass matrix (M is Minv)
       PetscCall(VecPointwiseMult(Stats, Stats, user->M));
 
       PetscCall(DMGlobalToLocal(user->dm, Stats, INSERT_VALUES, stats_loc));
